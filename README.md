@@ -36,7 +36,11 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
   - [x] Add a protected ride history page with status filters, search, route details, and fare estimates
   - [x] Show live ride counts and recent requests on the signed-in dashboard
   - [x] Clearly label history as device-local demo data, not account-synced receipts or paid fares
-- [ ] Day 9–14 — Backend, payments, reviews, polish, deployment
+- [x] **Day 9 — Ride reviews (browser-local prototype)**
+  - [x] Let riders rate completed demo trips from one to five stars with an optional short note
+  - [x] Restrict reviews to completed rides and allow one review per trip
+  - [x] Label reviews as device-local and not sent to drivers
+- [ ] Day 10–14 — Backend, payments, polish, deployment
   - [ ] Select and implement the database/backend before migrating ride records or adding payments
   - [ ] Add payment processing only through a server-backed provider checkout; never store card details in the browser
 
@@ -87,7 +91,7 @@ src/
 └─ proxy.ts                      # Clerk middleware (Next.js 16 "proxy" file)
 tests/
 ├─ ride.test.ts                  # Fare, distance, formatting, and offer ranking
-└─ ride-storage.test.ts          # Demo ride lifecycle and notification persistence
+└─ ride-storage.test.ts          # Ride lifecycle, notifications, and local reviews
 ```
 
 ## Scripts

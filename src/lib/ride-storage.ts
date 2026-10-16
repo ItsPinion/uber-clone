@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import type { DemoDriver, RideLocation, RideCategory, RideStatus, SavedRideRequest } from "@/lib/ride";
+import type { DemoDriver, RideLocation, RideCategory, RideStatus, SavedRideRequest, RideReview } from "@/lib/ride";
 
 const STORAGE_KEY = "cabbook:ride-requests:v1";
 const NOTIFICATIONS_KEY = "cabbook:notifications:v1";
@@ -108,6 +108,24 @@ export function saveRideRequest(request: Omit<SavedRideRequest, "id" | "createdA
   return nextRide;
 }
 
+export function saveRideReview(rideId: string, rating: number, comment: string) {
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    throw new Error("Choose a rating from 1 to 5 stars.");
+  }
+  if (comment.length > 500) {
+    throw new Error("Keep your review under 500 characters.");
+  }
+
+  const rides = getRidesSnapshot();
+  const currentRide = rides.find((ride) => ride.id === rideId);
+  if (!currentRide || currentRide.status !== "completed" || currentRide.review) return false;
+
+  const review = { rating, comment: comment.trim(), createdAt: new Date().toISOString() };
+  const nextRides = rides.map((ride) => ride.id === rideId ? { ...ride, review } : ride);
+  persistRides(nextRides);
+  return true;
+}
+
 export function cancelRideRequest(rideId: string) {
   return updateRideRequest(rideId, "cancelled", ["requested"], {
     title: "Ride request cancelled",
@@ -163,12 +181,12 @@ function updateRideRequest(
   return true;
 }
 
-function persistRides(rides: SavedRideRequest[], notification: Pick<RideNotification, "rideId" | "title" | "message">) {
+function persistRides(rides: SavedRideRequest[], notification?: Pick<RideNotification, "rideId" | "title" | "message">) {
   cachedRides = rides;
   cachedRidesRaw = JSON.stringify(rides);
   try {
     window.localStorage.setItem(STORAGE_KEY, cachedRidesRaw);
-    addNotification(notification, false);
+    if (notification) addNotification(notification, false);
     notifySubscribers();
   } catch {
     throw new Error("This browser could not save the ride update. Check that local storage is available.");
@@ -214,4 +232,4 @@ function updateNotificationReads(shouldMarkRead: (notification: RideNotification
   }
 }
 
-export type { RideLocation, RideCategory, SavedRideRequest, RideStatus, DemoDriver };
+export type { RideLocation, RideCategory, SavedRideRequest, RideStatus, DemoDriver, RideReview };

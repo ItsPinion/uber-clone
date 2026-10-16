@@ -6,6 +6,7 @@ import {
   completeRideRequest,
   markAllRideNotificationsRead,
   saveRideRequest,
+  saveRideReview,
   startRideRequest,
 } from "../src/lib/ride-storage";
 import { VIZAG_LOCATIONS, type DemoDriver } from "../src/lib/ride";
@@ -80,6 +81,24 @@ test("cancellation is limited to pending requests", () => {
 
   const savedRides = JSON.parse(storage.getItem("cabbook:ride-requests:v1") ?? "[]");
   assert.equal(savedRides[0].status, "cancelled");
+});
+
+test("reviews can be saved once for completed rides and are trimmed locally", () => {
+  const ride = saveRideRequest({ pickup, dropoff, distanceKm: 4, fare: 100, category: "mini" });
+  assert.equal(saveRideReview(ride.id, 5, "Not completed yet"), false);
+
+  acceptRideRequest(ride.id, demoDriver);
+  startRideRequest(ride.id);
+  completeRideRequest(ride.id);
+  assert.equal(saveRideReview(ride.id, 4, "  Smooth ride, thank you!  "), true);
+  assert.equal(saveRideReview(ride.id, 5, "Second review"), false);
+
+  const savedRides = JSON.parse(storage.getItem("cabbook:ride-requests:v1") ?? "[]");
+  assert.equal(savedRides[0].review.rating, 4);
+  assert.equal(savedRides[0].review.comment, "Smooth ride, thank you!");
+  assert.ok(savedRides[0].review.createdAt);
+  assert.throws(() => saveRideReview(ride.id, 0, "Invalid rating"), /1 to 5 stars/);
+  assert.throws(() => saveRideReview(ride.id, 5, "a".repeat(501)), /500 characters/);
 });
 
 test("ride lifecycle changes create notifications that can be marked read", () => {

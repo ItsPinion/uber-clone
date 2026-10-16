@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { useRideRequests } from "@/lib/ride-storage";
+import { saveRideReview, useRideRequests } from "@/lib/ride-storage";
 import { formatRupees, getRidePricing, type RideStatus } from "@/lib/ride";
 
 const filters = ["all", "active", "completed", "other"] as const;
@@ -53,6 +53,10 @@ export default function RideHistoryExperience() {
   const reduceMotion = useReducedMotion();
   const [filter, setFilter] = useState<RideFilter>("all");
   const [query, setQuery] = useState("");
+  const [reviewingRideId, setReviewingRideId] = useState<string | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewError, setReviewError] = useState("");
 
   const sortedRides = useMemo(
     () => [...rides].sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt)),
@@ -77,6 +81,28 @@ export default function RideHistoryExperience() {
   const completedRides = rides.filter((ride) => ride.status === "completed");
   const activeRides = rides.filter((ride) => isActive(ride.status));
   const estimatedCompletedFares = completedRides.reduce((sum, ride) => sum + ride.fare, 0);
+
+  function openReviewForm(rideId: string) {
+    setReviewingRideId(rideId);
+    setReviewRating(5);
+    setReviewComment("");
+    setReviewError("");
+  }
+
+  function submitReview(event: FormEvent<HTMLFormElement>, rideId: string) {
+    event.preventDefault();
+    try {
+      const saved = saveRideReview(rideId, reviewRating, reviewComment);
+      if (!saved) {
+        setReviewError("Only completed trips can be reviewed once.");
+        return;
+      }
+      setReviewingRideId(null);
+      setReviewError("");
+    } catch (error) {
+      setReviewError(error instanceof Error ? error.message : "Could not save this review.");
+    }
+  }
 
   return (
     <main className="mx-auto w-full max-w-[1180px] flex-1 px-4 py-8 sm:px-7 sm:py-11 lg:px-12">
@@ -165,6 +191,56 @@ export default function RideHistoryExperience() {
                 </div>
               </div>
               {ride.driver && <p className="mt-3 border-t border-[var(--line)] pt-3 text-[10px] text-[var(--muted)]">Driver: <span className="font-semibold text-[var(--ink)]">{ride.driver.name}</span> · {ride.driver.vehicle} · {ride.driver.plate}</p>}
+
+              {ride.status === "completed" && (
+                <section className="mt-4 border-t border-[var(--line)] pt-4" aria-label="Ride review">
+                  {ride.review ? (
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span role="img" aria-label={`${ride.review.rating} out of 5 stars`} className="text-sm tracking-wide text-amber-500">{"★".repeat(ride.review.rating)}{"☆".repeat(5 - ride.review.rating)}</span>
+                          <span className="text-[10px] font-semibold text-[var(--muted)]">Review saved on this device</span>
+                        </div>
+                        {ride.review.comment && <p className="mt-2 max-w-2xl text-xs leading-5 text-[var(--ink)]">“{ride.review.comment}”</p>}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => reviewingRideId === ride.id ? setReviewingRideId(null) : openReviewForm(ride.id)}
+                        aria-expanded={reviewingRideId === ride.id}
+                        className="rounded-full border border-emerald-500/25 bg-emerald-500/[0.07] px-4 py-2 text-[10px] font-bold text-emerald-800 transition hover:border-emerald-500/50 dark:text-emerald-200"
+                      >
+                        {reviewingRideId === ride.id ? "Close review" : "Rate this ride"}
+                      </button>
+                      {reviewingRideId === ride.id && (
+                        <form onSubmit={(event) => submitReview(event, ride.id)} className="mt-4 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4">
+                          <fieldset>
+                            <legend className="text-xs font-semibold text-[var(--ink)]">How was your ride?</legend>
+                            <div className="mt-2 flex items-center gap-1" role="group" aria-label="Rate this ride from one to five stars">
+                              {[1, 2, 3, 4, 5].map((rating) => (
+                                <button key={rating} type="button" aria-label={`${rating} ${rating === 1 ? "star" : "stars"}`} aria-pressed={reviewRating === rating} onClick={() => setReviewRating(rating)} className="rounded-lg px-1.5 py-1 text-2xl leading-none text-amber-500 transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+                                  {rating <= reviewRating ? "★" : "☆"}
+                                </button>
+                              ))}
+                            </div>
+                          </fieldset>
+                          <label className="mt-3 block text-[10px] font-semibold text-[var(--muted)]">
+                            Add a note <span className="font-normal">(optional)</span>
+                            <textarea value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} maxLength={500} rows={3} placeholder="What stood out about this ride?" className="mt-2 w-full resize-y rounded-xl border border-[var(--line)] bg-[var(--canvas)] px-3 py-2.5 text-xs leading-5 text-[var(--ink)] outline-none placeholder:text-[var(--muted)] focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" />
+                          </label>
+                          <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                            <span className="text-[9px] text-[var(--muted)]">{reviewComment.length}/500 · saved locally, not sent to a driver</span>
+                            <button type="submit" className="rounded-full bg-emerald-500 px-4 py-2 text-[10px] font-bold text-zinc-950 transition hover:bg-emerald-400">Save review</button>
+                          </div>
+                          {reviewError && <p role="alert" className="mt-3 text-xs font-medium text-rose-700 dark:text-rose-300">{reviewError}</p>}
+                        </form>
+                      )}
+                    </>
+                  )}
+                </section>
+              )}
             </motion.article>
           ))}
 
@@ -180,7 +256,7 @@ export default function RideHistoryExperience() {
       </section>
 
       <p className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3 text-[10px] leading-5 text-[var(--muted)]">
-        Demo notice: ride history is stored in this browser&apos;s local storage and is not account-synced. Fares are estimates, not receipts or proof of payment. Clearing browser data removes this history.
+        Demo notice: ride history and reviews stay in this browser&apos;s local storage and are not account-synced or sent to drivers. Fares are estimates, not receipts or proof of payment. Clearing browser data removes them.
       </p>
     </main>
   );

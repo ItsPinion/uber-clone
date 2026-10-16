@@ -16,6 +16,12 @@ export type DemoDriver = {
   pickupEtaMinutes: number;
 };
 
+export type RideReview = {
+  rating: number;
+  comment: string;
+  createdAt: string;
+};
+
 export type SavedRideRequest = {
   id: string;
   createdAt: string;
@@ -26,6 +32,7 @@ export type SavedRideRequest = {
   category: RideCategory;
   status: RideStatus;
   driver?: DemoDriver;
+  review?: RideReview;
 };
 
 export const VIZAG_LOCATIONS: RideLocation[] = [
