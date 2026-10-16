@@ -18,21 +18,21 @@ export default function HomePage() {
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Suspense fallback={<div className="h-12" />}>
-          <Show when="signed-out">
-            <SignUpButton>
-              <button className="w-full rounded-xl bg-zinc-900 px-6 py-3 font-semibold text-white transition hover:bg-zinc-700 sm:w-auto">
-                Get started
-              </button>
-            </SignUpButton>
-          </Show>
-          <Show when="signed-in">
-            <Link
-              href="/dashboard"
-              className="w-full rounded-xl bg-emerald-600 px-6 py-3 font-semibold text-white transition hover:bg-emerald-700 sm:w-auto"
-            >
-              Go to dashboard
-            </Link>
-          </Show>
+            <Show when="signed-out">
+              <SignUpButton>
+                <button className="w-full rounded-xl bg-zinc-900 px-6 py-3 font-semibold text-white transition hover:bg-zinc-700 sm:w-auto">
+                  Get started
+                </button>
+              </SignUpButton>
+            </Show>
+            <Show when="signed-in">
+              <Link
+                href="/dashboard"
+                className="w-full rounded-xl bg-emerald-600 px-6 py-3 font-semibold text-white transition hover:bg-emerald-700 sm:w-auto"
+              >
+                Go to dashboard
+              </Link>
+            </Show>
           </Suspense>
         </div>
       </section>
