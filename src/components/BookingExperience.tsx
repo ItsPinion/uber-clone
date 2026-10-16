@@ -13,9 +13,108 @@ const RIDE_CATEGORIES: { id: RideCategory; description: string; icon: string; de
   { id: "xl", description: "Room for everyone", icon: "▦", detail: "Up to 6 seats" },
 ];
 
+type LocationPickerProps = {
+  id: "pickup-location" | "dropoff-location";
+  label: string;
+  selectedLocationId: string;
+  locations: typeof VIZAG_LOCATIONS;
+  open: boolean;
+  onToggle: (id: LocationPickerProps["id"] | null) => void;
+  onSelect: (locationId: string) => void;
+};
+
+function LocationPicker({ id, label, selectedLocationId, locations, open, onToggle, onSelect }: LocationPickerProps) {
+  const selected = locations.find((location) => location.id === selectedLocationId) ?? locations[0];
+
+  function selectLocation(locationId: string) {
+    onSelect(locationId);
+    onToggle(null);
+    requestAnimationFrame(() => document.getElementById(id)?.focus());
+  }
+
+  return (
+    <div>
+      <button
+        id={id}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={`${id}-options`}
+        onClick={() => onToggle(open ? null : id)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && open) {
+            event.preventDefault();
+            onToggle(null);
+          } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            onToggle(id);
+          }
+        }}
+        className={`group w-full rounded-2xl border bg-[var(--canvas)] p-4 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/15 ${open ? "border-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.08)]" : "border-[var(--line)] hover:border-emerald-500/40"}`}
+      >
+        <span className="flex items-center justify-between gap-4">
+          <span className="min-w-0">
+            <span className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.17em] text-[var(--muted)]">
+              <span className={`h-2 w-2 rounded-sm ${id === "pickup-location" ? "rounded-full bg-emerald-500" : "bg-zinc-950 dark:bg-emerald-300"}`} />
+              {label}
+            </span>
+            <span className="mt-2 block truncate text-sm font-semibold text-[var(--ink)]">{selected.name} <span className="font-normal text-[var(--muted)]">· {selected.area}</span></span>
+          </span>
+          <motion.span animate={{ rotate: open ? 180 : 0 }} className="shrink-0 text-sm text-[var(--muted)]" aria-hidden="true">⌄</motion.span>
+        </span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            id={`${id}-options`}
+            role="listbox"
+            aria-label={`Choose ${label.toLowerCase()}`}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                onToggle(null);
+                document.getElementById(id)?.focus();
+              }
+            }}
+            className="mt-2 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-1.5 shadow-[0_12px_28px_rgba(0,0,0,0.12)]"
+          >
+            <div className="max-h-56 overflow-y-auto">
+              {locations.map((location) => {
+                const isSelected = location.id === selectedLocationId;
+                return (
+                  <button
+                    key={location.id}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => selectLocation(location.id)}
+                    className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${isSelected ? "bg-emerald-500/10 text-[var(--ink)]" : "text-[var(--ink)] hover:bg-[var(--surface-2)]"}`}
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-semibold">{location.name}</span>
+                      <span className="mt-0.5 block truncate text-[10px] text-[var(--muted)]">{location.area}</span>
+                    </span>
+                    {isSelected && <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300" aria-hidden="true">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export default function BookingExperience() {
   const [pickupId, setPickupId] = useState("dwaraka");
   const [dropoffId, setDropoffId] = useState("rk-beach");
+  const [openLocationPicker, setOpenLocationPicker] = useState<"pickup-location" | "dropoff-location" | null>(null);
   const [category, setCategory] = useState<RideCategory>("comfort");
   const [requestId, setRequestId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -73,25 +172,28 @@ export default function BookingExperience() {
             <motion.span animate={reduceMotion ? undefined : { rotate: [0, 7, -5, 0] }} transition={{ duration: 4.5, repeat: Infinity }} className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-lg text-emerald-700 dark:text-emerald-300">⌖</motion.span>
           </div>
 
-          <div className="relative mt-6 space-y-3">
-            <div className="pointer-events-none absolute bottom-[-16px] left-[18px] top-[46px] border-l border-dashed border-emerald-500/40" />
-            <label className="relative block rounded-2xl border border-[var(--line)] bg-[var(--canvas)] p-3.5 transition focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10">
-              <span className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.17em] text-[var(--muted)]"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Pick-up location</span>
-              <select value={pickupId} onChange={(event) => setPickupId(event.target.value)} className="mt-2 w-full appearance-none bg-transparent pr-7 text-sm font-semibold text-[var(--ink)] outline-none">
-                {VIZAG_LOCATIONS.map((location) => <option key={location.id} value={location.id}>{location.name} · {location.area}</option>)}
-              </select>
-              <span aria-hidden="true" className="pointer-events-none absolute right-4 top-1/2 mt-1 text-[var(--muted)]">⌄</span>
-            </label>
-
-            <motion.button type="button" aria-label="Swap pick-up and drop-off" onClick={swapLocations} whileHover={reduceMotion ? undefined : { rotate: 180, scale: 1.06 }} whileTap={reduceMotion ? undefined : { scale: 0.92 }} transition={{ type: "spring", stiffness: 240, damping: 16 }} className="absolute right-3 top-[73px] z-10 flex h-9 w-9 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-sm text-[var(--muted)] shadow-sm">↕</motion.button>
-
-            <label className="relative block rounded-2xl border border-[var(--line)] bg-[var(--canvas)] p-3.5 transition focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10">
-              <span className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.17em] text-[var(--muted)]"><span className="h-2 w-2 rounded-[2px] bg-zinc-950 dark:bg-emerald-300" /> Drop-off location</span>
-              <select value={dropoffId} onChange={(event) => setDropoffId(event.target.value)} className="mt-2 w-full appearance-none bg-transparent pr-7 text-sm font-semibold text-[var(--ink)] outline-none">
-                {VIZAG_LOCATIONS.map((location) => <option key={location.id} value={location.id}>{location.name} · {location.area}</option>)}
-              </select>
-              <span aria-hidden="true" className="pointer-events-none absolute right-4 top-1/2 mt-1 text-[var(--muted)]">⌄</span>
-            </label>
+          <div className="mt-6 space-y-3">
+            <LocationPicker
+              id="pickup-location"
+              label="Pick-up location"
+              selectedLocationId={pickupId}
+              locations={VIZAG_LOCATIONS}
+              open={openLocationPicker === "pickup-location"}
+              onToggle={setOpenLocationPicker}
+              onSelect={setPickupId}
+            />
+            <div className="flex justify-end pr-3">
+              <motion.button type="button" aria-label="Swap pick-up and drop-off" onClick={swapLocations} whileHover={reduceMotion ? undefined : { rotate: 180, scale: 1.06 }} whileTap={reduceMotion ? undefined : { scale: 0.92 }} transition={{ type: "spring", stiffness: 240, damping: 16 }} className="-my-1 flex h-9 w-9 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-sm text-[var(--muted)] shadow-sm transition-colors hover:border-emerald-500/40 hover:text-emerald-700 dark:hover:text-emerald-300">↕</motion.button>
+            </div>
+            <LocationPicker
+              id="dropoff-location"
+              label="Drop-off location"
+              selectedLocationId={dropoffId}
+              locations={VIZAG_LOCATIONS}
+              open={openLocationPicker === "dropoff-location"}
+              onToggle={setOpenLocationPicker}
+              onSelect={setDropoffId}
+            />
           </div>
 
           <div className="mt-6 flex items-center justify-between">
