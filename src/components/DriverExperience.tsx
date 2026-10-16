@@ -1,17 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { acceptRideRequest, completeRideRequest, declineRideRequest, startRideRequest, useRideRequests } from "@/lib/ride-storage";
+import { cacheServerRideUpdate, updateRideOnServer, useRideRequests } from "@/lib/ride-storage";
 import { DEMO_DRIVER_LOCATION, formatRupees, getRidePricing, rankRideOffers } from "@/lib/ride";
-import type { DemoDriver, SavedRideRequest } from "@/lib/ride";
+import type { SavedRideRequest } from "@/lib/ride";
 
-const DEMO_DRIVER: DemoDriver = {
-  name: "CabBook Demo Driver",
+const DEMO_DRIVER = {
   vehicle: "Emerald sedan · 2024",
   plate: "DEMO · AP 31",
-  pickupEtaMinutes: 5,
 };
 
 function RideStatusBadge({ status }: { status: SavedRideRequest["status"] }) {
@@ -36,9 +35,12 @@ function RideStatusBadge({ status }: { status: SavedRideRequest["status"] }) {
 }
 
 export default function DriverExperience() {
+  const { isLoaded, user } = useUser();
+  const userId = isLoaded ? user?.id ?? null : null;
   const requests = useRideRequests();
   const [isOnline, setIsOnline] = useState(true);
   const [error, setError] = useState("");
+  const [updatingRideId, setUpdatingRideId] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
   const offers = useMemo(() => rankRideOffers(requests, DEMO_DRIVER_LOCATION), [requests]);
   const activeRide = requests.find((ride) => ride.status === "accepted" || ride.status === "in_progress");
@@ -46,32 +48,20 @@ export default function DriverExperience() {
   const offeredCount = offers.length;
   const history = requests.filter((ride) => ["completed", "declined", "cancelled"].includes(ride.status)).slice(0, 4);
 
-  function accept(ride: SavedRideRequest, pickupEtaMinutes: number) {
-    setError("");
-    try {
-      const accepted = acceptRideRequest(ride.id, { ...DEMO_DRIVER, pickupEtaMinutes });
-      if (!accepted) setError("This request has already been updated in another tab. Refresh the offer list.");
-    } catch (acceptError) {
-      setError(acceptError instanceof Error ? acceptError.message : "Could not accept this ride.");
+  async function updateRide(rideId: string, action: "accept" | "decline" | "start" | "complete") {
+    if (!userId) {
+      setError("Sign in before updating a ride.");
+      return;
     }
-  }
-
-  function decline(rideId: string) {
     setError("");
+    setUpdatingRideId(rideId);
     try {
-      declineRideRequest(rideId);
-    } catch (declineError) {
-      setError(declineError instanceof Error ? declineError.message : "Could not update this request.");
-    }
-  }
-
-  function advanceRide(rideId: string, next: "start" | "complete") {
-    setError("");
-    try {
-      const updated = next === "start" ? startRideRequest(rideId) : completeRideRequest(rideId);
-      if (!updated) setError("This ride has already changed in another tab. Refresh your dashboard.");
+      const updated = await updateRideOnServer(rideId, action);
+      cacheServerRideUpdate(updated, action, userId);
     } catch (rideError) {
       setError(rideError instanceof Error ? rideError.message : "Could not update the ride status.");
+    } finally {
+      setUpdatingRideId(null);
     }
   }
 
@@ -136,8 +126,8 @@ export default function DriverExperience() {
                       </div>
                     </div>
                     <div className="flex gap-2 border-t border-[var(--line)] bg-[var(--canvas)]/60 p-3 sm:justify-end sm:px-5">
-                      <motion.button type="button" disabled={!isOnline || Boolean(activeRide)} onClick={() => decline(ride.id)} whileHover={reduceMotion ? undefined : { scale: 1.02 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }} className="rounded-full px-4 py-2 text-xs font-semibold text-[var(--muted)] transition hover:bg-[var(--surface-2)] disabled:cursor-not-allowed disabled:opacity-40">Pass</motion.button>
-                      <motion.button type="button" disabled={!isOnline || Boolean(activeRide)} onClick={() => accept(ride, pickupEtaMinutes)} whileHover={reduceMotion ? undefined : { y: -2, scale: 1.02 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }} className="rounded-full bg-emerald-500 px-5 py-2 text-xs font-bold text-zinc-950 shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40">{!isOnline ? "Go online to accept" : activeRide ? "Finish active ride first" : "Accept ride ↗"}</motion.button>
+                      <motion.button type="button" disabled={!isOnline || Boolean(activeRide) || updatingRideId === ride.id} onClick={() => void updateRide(ride.id, "decline")} whileHover={reduceMotion ? undefined : { scale: 1.02 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }} className="rounded-full px-4 py-2 text-xs font-semibold text-[var(--muted)] transition hover:bg-[var(--surface-2)] disabled:cursor-not-allowed disabled:opacity-40">Pass</motion.button>
+                      <motion.button type="button" disabled={!isOnline || Boolean(activeRide) || updatingRideId === ride.id} onClick={() => void updateRide(ride.id, "accept")} whileHover={reduceMotion ? undefined : { y: -2, scale: 1.02 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }} className="rounded-full bg-emerald-500 px-5 py-2 text-xs font-bold text-zinc-950 shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40">{!isOnline ? "Go online to accept" : activeRide ? "Finish active ride first" : updatingRideId === ride.id ? "Saving…" : "Accept ride ↗"}</motion.button>
                     </div>
                   </motion.article>
                 ))}
@@ -168,7 +158,7 @@ export default function DriverExperience() {
                   <p className="text-xs font-semibold text-[var(--ink)]">{activeRide.pickup.name}</p><div className="my-2 ml-1.5 h-5 border-l border-dashed border-emerald-500/40" /><p className="text-xs font-semibold text-[var(--ink)]">{activeRide.dropoff.name}</p>
                   <div className="mt-4 flex items-center justify-between border-t border-[var(--line)] pt-3 text-[10px]"><span className="text-[var(--muted)]">Estimated fare</span><span className="font-bold text-[var(--ink)]">{formatRupees(activeRide.fare)}</span></div>
                 </div>
-                <motion.button type="button" onClick={() => advanceRide(activeRide.id, activeRide.status === "accepted" ? "start" : "complete")} whileHover={reduceMotion ? undefined : { y: -2 }} whileTap={reduceMotion ? undefined : { scale: 0.98 }} className="mt-4 w-full rounded-full bg-emerald-500 px-4 py-3 text-xs font-bold text-zinc-950 transition hover:bg-emerald-400">{activeRide.status === "accepted" ? "Start trip" : "Complete trip"} <span aria-hidden="true">↗</span></motion.button>
+                <motion.button type="button" disabled={updatingRideId === activeRide.id} onClick={() => void updateRide(activeRide.id, activeRide.status === "accepted" ? "start" : "complete")} whileHover={reduceMotion || updatingRideId === activeRide.id ? undefined : { y: -2 }} whileTap={reduceMotion || updatingRideId === activeRide.id ? undefined : { scale: 0.98 }} className="mt-4 w-full rounded-full bg-emerald-500 px-4 py-3 text-xs font-bold text-zinc-950 transition hover:bg-emerald-400 disabled:cursor-wait disabled:opacity-60">{updatingRideId === activeRide.id ? "Saving…" : activeRide.status === "accepted" ? "Start trip" : "Complete trip"} <span aria-hidden="true">↗</span></motion.button>
                 <p className="mt-3 text-center text-[9px] leading-4 text-[var(--muted)]">Demo status changes appear in the rider&apos;s open booking tab.</p>
               </motion.section>
             ) : (
@@ -194,7 +184,7 @@ export default function DriverExperience() {
         </aside>
       </div>
 
-      <p className="mt-5 text-center text-[9px] leading-5 text-[var(--muted)]">Demo driver actions update browser-local ride requests across same-origin tabs. Persistent driver matching will use the Day 2 backend.</p>
+      <p className="mt-5 text-center text-[9px] leading-5 text-[var(--muted)]">Ride updates are persisted to your account and cached for same-origin tab sync. This is still a demo driver flow, not a real matching service.</p>
     </main>
   );
 }

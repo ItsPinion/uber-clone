@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { useMemo, useState, type FormEvent } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { saveRideReview, useRideRequests } from "@/lib/ride-storage";
+import { cacheServerRideUpdate, updateRideOnServer, useRideRequests } from "@/lib/ride-storage";
 import { formatRupees, getRidePricing, type RideStatus } from "@/lib/ride";
 
 const filters = ["all", "active", "completed", "other"] as const;
@@ -49,6 +50,8 @@ function matchesFilter(status: RideStatus, filter: RideFilter) {
 }
 
 export default function RideHistoryExperience() {
+  const { isLoaded, user } = useUser();
+  const userId = isLoaded ? user?.id ?? null : null;
   const rides = useRideRequests();
   const reduceMotion = useReducedMotion();
   const [filter, setFilter] = useState<RideFilter>("all");
@@ -57,6 +60,7 @@ export default function RideHistoryExperience() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewError, setReviewError] = useState("");
+  const [isSavingReview, setIsSavingReview] = useState(false);
 
   const sortedRides = useMemo(
     () => [...rides].sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt)),
@@ -89,18 +93,22 @@ export default function RideHistoryExperience() {
     setReviewError("");
   }
 
-  function submitReview(event: FormEvent<HTMLFormElement>, rideId: string) {
+  async function submitReview(event: FormEvent<HTMLFormElement>, rideId: string) {
     event.preventDefault();
+    if (!userId) {
+      setReviewError("Sign in before saving a review.");
+      return;
+    }
+    setIsSavingReview(true);
     try {
-      const saved = saveRideReview(rideId, reviewRating, reviewComment);
-      if (!saved) {
-        setReviewError("Only completed trips can be reviewed once.");
-        return;
-      }
+      const updated = await updateRideOnServer(rideId, "review", { rating: reviewRating, comment: reviewComment });
+      cacheServerRideUpdate(updated, "review", userId);
       setReviewingRideId(null);
       setReviewError("");
     } catch (error) {
       setReviewError(error instanceof Error ? error.message : "Could not save this review.");
+    } finally {
+      setIsSavingReview(false);
     }
   }
 
@@ -199,7 +207,7 @@ export default function RideHistoryExperience() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span role="img" aria-label={`${ride.review.rating} out of 5 stars`} className="text-sm tracking-wide text-amber-500">{"★".repeat(ride.review.rating)}{"☆".repeat(5 - ride.review.rating)}</span>
-                          <span className="text-[10px] font-semibold text-[var(--muted)]">Review saved on this device</span>
+                          <span className="text-[10px] font-semibold text-[var(--muted)]">Review saved to your account</span>
                         </div>
                         {ride.review.comment && <p className="mt-2 max-w-2xl text-xs leading-5 text-[var(--ink)]">“{ride.review.comment}”</p>}
                       </div>
@@ -231,8 +239,8 @@ export default function RideHistoryExperience() {
                             <textarea value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} maxLength={500} rows={3} placeholder="What stood out about this ride?" className="mt-2 w-full resize-y rounded-xl border border-[var(--line)] bg-[var(--canvas)] px-3 py-2.5 text-xs leading-5 text-[var(--ink)] outline-none placeholder:text-[var(--muted)] focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" />
                           </label>
                           <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-                            <span className="text-[9px] text-[var(--muted)]">{reviewComment.length}/500 · saved locally, not sent to a driver</span>
-                            <button type="submit" className="rounded-full bg-emerald-500 px-4 py-2 text-[10px] font-bold text-zinc-950 transition hover:bg-emerald-400">Save review</button>
+                            <span className="text-[9px] text-[var(--muted)]">{reviewComment.length}/500 · saved to your account, not sent to a driver</span>
+                            <button type="submit" disabled={isSavingReview || !userId} className="rounded-full bg-emerald-500 px-4 py-2 text-[10px] font-bold text-zinc-950 transition hover:bg-emerald-400 disabled:cursor-wait disabled:opacity-60">{isSavingReview ? "Saving…" : "Save review"}</button>
                           </div>
                           {reviewError && <p role="alert" className="mt-3 text-xs font-medium text-rose-700 dark:text-rose-300">{reviewError}</p>}
                         </form>
@@ -256,7 +264,7 @@ export default function RideHistoryExperience() {
       </section>
 
       <p className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3 text-[10px] leading-5 text-[var(--muted)]">
-        Demo notice: ride history and reviews stay in this browser&apos;s local storage and are not account-synced or sent to drivers. Fares are estimates, not receipts or proof of payment. Clearing browser data removes them.
+        Demo notice: ride history, status changes, and reviews are saved to your signed-in account. Browser-local notifications remain on this device. Fares are estimates, not receipts or proof of payment.
       </p>
     </main>
   );

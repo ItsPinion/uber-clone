@@ -1,19 +1,25 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { useUser } from "@clerk/nextjs";
 import type { DemoDriver, RideLocation, RideCategory, RideStatus, SavedRideRequest, RideReview } from "@/lib/ride";
 
-const STORAGE_KEY = "cabbook:ride-requests:v1";
-const NOTIFICATIONS_KEY = "cabbook:notifications:v1";
+const LEGACY_STORAGE_KEY = "cabbook:ride-requests:v1";
+const LEGACY_NOTIFICATIONS_KEY = "cabbook:notifications:v1";
 const CHANGE_EVENT = "cabbook:ride-data-change";
 const CHANNEL_NAME = "cabbook:ride-updates";
 const EMPTY_RIDES: SavedRideRequest[] = [];
 const EMPTY_NOTIFICATIONS: RideNotification[] = [];
+let cachedRidesKey: string | null = null;
 let cachedRidesRaw: string | null = null;
 let cachedRides: SavedRideRequest[] = EMPTY_RIDES;
+let cachedNotificationsKey: string | null = null;
 let cachedNotificationsRaw: string | null = null;
 let cachedNotifications: RideNotification[] = EMPTY_NOTIFICATIONS;
 let syncChannel: BroadcastChannel | null = null;
+const serverHydrationStarted = new Set<string>();
+const localRideMutations = new Map<string, Map<string, number>>();
+let rideMutationSequence = 0;
 
 export type RideNotification = {
   id: string;
@@ -28,6 +34,14 @@ function makeId(prefix: string) {
   return globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now()}`;
 }
 
+function rideStorageKey(userId: string | null) {
+  return userId ? `cabbook:ride-requests:v2:${encodeURIComponent(userId)}` : LEGACY_STORAGE_KEY;
+}
+
+function notificationStorageKey(userId: string | null) {
+  return userId ? `cabbook:notifications:v2:${encodeURIComponent(userId)}` : LEGACY_NOTIFICATIONS_KEY;
+}
+
 function getSyncChannel() {
   if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") return null;
   syncChannel ??= new BroadcastChannel(CHANNEL_NAME);
@@ -39,32 +53,38 @@ function notifySubscribers() {
   getSyncChannel()?.postMessage({ type: "state-changed" });
 }
 
-function getRidesSnapshot() {
+function getRidesSnapshot(userId: string | null = null) {
   if (typeof window === "undefined") return EMPTY_RIDES;
+  const storageKey = rideStorageKey(userId);
   try {
-    const rawValue = window.localStorage.getItem(STORAGE_KEY) ?? "[]";
-    if (rawValue !== cachedRidesRaw) {
+    const rawValue = window.localStorage.getItem(storageKey) ?? "[]";
+    if (storageKey !== cachedRidesKey || rawValue !== cachedRidesRaw) {
+      cachedRidesKey = storageKey;
       cachedRidesRaw = rawValue;
       const parsed: unknown = JSON.parse(rawValue);
       cachedRides = Array.isArray(parsed) ? (parsed as SavedRideRequest[]) : EMPTY_RIDES;
     }
   } catch {
+    cachedRidesKey = storageKey;
     cachedRidesRaw = "[]";
     cachedRides = EMPTY_RIDES;
   }
   return cachedRides;
 }
 
-function getNotificationsSnapshot() {
+function getNotificationsSnapshot(userId: string | null = null) {
   if (typeof window === "undefined") return EMPTY_NOTIFICATIONS;
+  const storageKey = notificationStorageKey(userId);
   try {
-    const rawValue = window.localStorage.getItem(NOTIFICATIONS_KEY) ?? "[]";
-    if (rawValue !== cachedNotificationsRaw) {
+    const rawValue = window.localStorage.getItem(storageKey) ?? "[]";
+    if (storageKey !== cachedNotificationsKey || rawValue !== cachedNotificationsRaw) {
+      cachedNotificationsKey = storageKey;
       cachedNotificationsRaw = rawValue;
       const parsed: unknown = JSON.parse(rawValue);
       cachedNotifications = Array.isArray(parsed) ? (parsed as RideNotification[]) : EMPTY_NOTIFICATIONS;
     }
   } catch {
+    cachedNotificationsKey = storageKey;
     cachedNotificationsRaw = "[]";
     cachedNotifications = EMPTY_NOTIFICATIONS;
   }
@@ -85,13 +105,77 @@ function subscribeToRideData(onStoreChange: () => void) {
 }
 
 export function useRideRequests() {
-  return useSyncExternalStore(subscribeToRideData, getRidesSnapshot, () => EMPTY_RIDES);
+  const { isLoaded, user } = useUser();
+  const userId = isLoaded ? user?.id ?? null : null;
+  const rides = useSyncExternalStore(
+    subscribeToRideData,
+    () => userId ? getRidesSnapshot(userId) : EMPTY_RIDES,
+    () => EMPTY_RIDES,
+  );
+  useEffect(() => {
+    if (userId && !serverHydrationStarted.has(userId)) {
+      serverHydrationStarted.add(userId);
+      void hydrateRideRequestsFromServer(userId);
+    }
+  }, [userId]);
+  return rides;
+}
+
+async function hydrateRideRequestsFromServer(userId: string) {
+  const mutationSequenceAtStart = rideMutationSequence;
+  try {
+    const response = await fetch("/api/rides", { cache: "no-store" });
+    const payload = await response.json().catch(() => null) as { rides?: SavedRideRequest[] } | null;
+    if (!response.ok || !payload || !Array.isArray(payload.rides)) {
+      serverHydrationStarted.delete(userId);
+      return;
+    }
+    replaceRideRequestsFromServer(payload.rides, userId, mutationSequenceAtStart);
+  } catch {
+    serverHydrationStarted.delete(userId);
+  }
+}
+
+async function readApiPayload(response: Response) {
+  return await response.json().catch(() => null) as { ride?: SavedRideRequest; error?: string } | null;
+}
+
+export async function requestRideFromServer(pickupId: string, dropoffId: string, category: RideCategory) {
+  const response = await fetch("/api/rides", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pickupId, dropoffId, category }),
+  });
+  const payload = await readApiPayload(response);
+  if (!response.ok || !payload?.ride) throw new Error(payload?.error ?? "Could not save the ride to the database.");
+  return payload.ride;
+}
+
+export type RideUpdateAction = "cancel" | "decline" | "accept" | "start" | "complete" | "review";
+
+export async function updateRideOnServer(rideId: string, action: RideUpdateAction, details: Record<string, unknown> = {}) {
+  const response = await fetch(`/api/rides/${encodeURIComponent(rideId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...details, action }),
+  });
+  const payload = await readApiPayload(response);
+  if (!response.ok || !payload?.ride) throw new Error(payload?.error ?? "Could not save the ride update.");
+  return payload.ride;
 }
 
 export function useRideNotifications() {
-  return useSyncExternalStore(subscribeToRideData, getNotificationsSnapshot, () => EMPTY_NOTIFICATIONS);
+  const { isLoaded, user } = useUser();
+  const userId = isLoaded ? user?.id ?? null : null;
+  return useSyncExternalStore(
+    subscribeToRideData,
+    () => userId ? getNotificationsSnapshot(userId) : EMPTY_NOTIFICATIONS,
+    () => EMPTY_NOTIFICATIONS,
+  );
 }
 
+// Kept for the browser-local storage unit tests and old, unclaimed browser data.
+// The signed-in ride flows only create records through requestRideFromServer.
 export function saveRideRequest(request: Omit<SavedRideRequest, "id" | "createdAt" | "status" | "driver">) {
   const nextRide: SavedRideRequest = {
     ...request,
@@ -99,13 +183,69 @@ export function saveRideRequest(request: Omit<SavedRideRequest, "id" | "createdA
     createdAt: new Date().toISOString(),
     status: "requested",
   };
-  const nextList = [nextRide, ...getRidesSnapshot()].slice(0, 20);
+  return cacheServerRideRequest(nextRide);
+}
+
+export function cacheServerRideRequest(ride: SavedRideRequest, userId: string | null = null) {
+  recordLocalRideMutation(ride, userId);
+  const nextList = [ride, ...getRidesSnapshot(userId).filter((existing) => existing.id !== ride.id)].slice(0, 100);
   persistRides(nextList, {
-    rideId: nextRide.id,
+    rideId: ride.id,
     title: "New ride request",
-    message: `${nextRide.pickup.name} to ${nextRide.dropoff.name}`,
-  });
-  return nextRide;
+    message: `${ride.pickup.name} to ${ride.dropoff.name}`,
+  }, userId);
+  return ride;
+}
+
+export function cacheServerRideUpdate(ride: SavedRideRequest, action: RideUpdateAction, userId: string | null = null) {
+  recordLocalRideMutation(ride, userId);
+  const messages: Partial<Record<RideUpdateAction, Pick<RideNotification, "title" | "message">>> = {
+    cancel: { title: "Ride request cancelled", message: "The rider cancelled this demo request." },
+    decline: { title: "Ride request passed on", message: "A driver passed on this demo request." },
+    accept: { title: "Driver matched", message: `${ride.driver?.name ?? "A driver"} is heading to pick-up in about ${ride.driver?.pickupEtaMinutes ?? "a few"} minutes.` },
+    start: { title: "Ride started", message: "Your demo trip is now in progress." },
+    complete: { title: "Ride completed", message: "Your demo trip is complete. Thanks for riding with CabBook." },
+  };
+  const nextList = [ride, ...getRidesSnapshot(userId).filter((existing) => existing.id !== ride.id)].slice(0, 100);
+  const notification = messages[action];
+  persistRides(nextList, notification ? { ...notification, rideId: ride.id } : undefined, userId);
+  return ride;
+}
+
+function recordLocalRideMutation(ride: SavedRideRequest, userId: string | null) {
+  if (!userId) return;
+  rideMutationSequence += 1;
+  const userMutations = localRideMutations.get(userId) ?? new Map<string, number>();
+  userMutations.set(ride.id, rideMutationSequence);
+  if (userMutations.size > 100) {
+    const oldestRideId = userMutations.keys().next().value;
+    if (oldestRideId) userMutations.delete(oldestRideId);
+  }
+  localRideMutations.set(userId, userMutations);
+}
+
+function replaceRideRequestsFromServer(serverRides: SavedRideRequest[], userId: string, mutationSequenceAtStart: number) {
+  const storageKey = rideStorageKey(userId);
+  const serverById = new Map(serverRides.map((ride) => [ride.id, ride]));
+  const localRides = getRidesSnapshot(userId);
+  const userMutations = localRideMutations.get(userId);
+  for (const ride of localRides) {
+    if ((userMutations?.get(ride.id) ?? 0) > mutationSequenceAtStart) serverById.set(ride.id, ride);
+  }
+  const rides = [...serverById.values()]
+    .sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt))
+    .slice(0, 100);
+  const serialized = JSON.stringify(rides);
+  try {
+    window.localStorage.setItem(storageKey, serialized);
+    if (cachedRidesKey === storageKey) {
+      cachedRides = rides;
+      cachedRidesRaw = serialized;
+    }
+    notifySubscribers();
+  } catch {
+    throw new Error("This browser could not cache server rides locally.");
+  }
 }
 
 export function saveRideReview(rideId: string, rating: number, comment: string) {
@@ -181,51 +321,62 @@ function updateRideRequest(
   return true;
 }
 
-function persistRides(rides: SavedRideRequest[], notification?: Pick<RideNotification, "rideId" | "title" | "message">) {
+function persistRides(
+  rides: SavedRideRequest[],
+  notification?: Pick<RideNotification, "rideId" | "title" | "message">,
+  userId: string | null = null,
+) {
   cachedRides = rides;
+  cachedRidesKey = rideStorageKey(userId);
   cachedRidesRaw = JSON.stringify(rides);
   try {
-    window.localStorage.setItem(STORAGE_KEY, cachedRidesRaw);
-    if (notification) addNotification(notification, false);
+    window.localStorage.setItem(cachedRidesKey, cachedRidesRaw);
+    if (notification) addNotification(notification, false, userId);
     notifySubscribers();
   } catch {
     throw new Error("This browser could not save the ride update. Check that local storage is available.");
   }
 }
 
-function addNotification(notification: Pick<RideNotification, "rideId" | "title" | "message">, shouldNotify = true) {
+function addNotification(
+  notification: Pick<RideNotification, "rideId" | "title" | "message">,
+  shouldNotify = true,
+  userId: string | null = null,
+) {
   const nextNotification: RideNotification = {
     ...notification,
     id: makeId("notice"),
     createdAt: new Date().toISOString(),
     read: false,
   };
-  const nextList = [nextNotification, ...getNotificationsSnapshot()].slice(0, 30);
+  const nextList = [nextNotification, ...getNotificationsSnapshot(userId)].slice(0, 30);
   cachedNotifications = nextList;
+  cachedNotificationsKey = notificationStorageKey(userId);
   cachedNotificationsRaw = JSON.stringify(nextList);
-  window.localStorage.setItem(NOTIFICATIONS_KEY, cachedNotificationsRaw);
+  window.localStorage.setItem(cachedNotificationsKey, cachedNotificationsRaw);
   if (shouldNotify) notifySubscribers();
 }
 
-export function markRideNotificationRead(notificationId: string) {
-  updateNotificationReads((notification) => notification.id === notificationId);
+export function markRideNotificationRead(notificationId: string, userId: string | null = null) {
+  updateNotificationReads((notification) => notification.id === notificationId, userId);
 }
 
-export function markAllRideNotificationsRead() {
-  updateNotificationReads(() => true);
+export function markAllRideNotificationsRead(userId: string | null = null) {
+  updateNotificationReads(() => true, userId);
 }
 
-function updateNotificationReads(shouldMarkRead: (notification: RideNotification) => boolean) {
-  const notifications = getNotificationsSnapshot();
+function updateNotificationReads(shouldMarkRead: (notification: RideNotification) => boolean, userId: string | null) {
+  const notifications = getNotificationsSnapshot(userId);
   const nextList = notifications.map((notification) =>
     shouldMarkRead(notification) ? { ...notification, read: true } : notification,
   );
   if (nextList.every((notification, index) => notification === notifications[index])) return;
 
   cachedNotifications = nextList;
+  cachedNotificationsKey = notificationStorageKey(userId);
   cachedNotificationsRaw = JSON.stringify(nextList);
   try {
-    window.localStorage.setItem(NOTIFICATIONS_KEY, cachedNotificationsRaw);
+    window.localStorage.setItem(cachedNotificationsKey, cachedNotificationsRaw);
     notifySubscribers();
   } catch {
     throw new Error("This browser could not save notification changes.");

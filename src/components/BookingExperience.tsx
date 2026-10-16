@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import RideMap from "@/components/RideMap";
 import { calculateDistanceKm, estimateFare, formatRupees, getRidePricing, VIZAG_LOCATIONS, type RideCategory } from "@/lib/ride";
-import { cancelRideRequest, saveRideRequest, useRideRequests } from "@/lib/ride-storage";
+import { cacheServerRideRequest, cacheServerRideUpdate, requestRideFromServer, updateRideOnServer, useRideRequests } from "@/lib/ride-storage";
 
 const RIDE_CATEGORIES: { id: RideCategory; description: string; icon: string; detail: string }[] = [
   { id: "mini", description: "A comfy city run", icon: "◌", detail: "Quick & easy" },
@@ -118,7 +119,10 @@ export default function BookingExperience() {
   const [category, setCategory] = useState<RideCategory>("comfort");
   const [requestId, setRequestId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const { isLoaded, user } = useUser();
+  const userId = isLoaded ? user?.id ?? null : null;
   const rideRequests = useRideRequests();
   const reduceMotion = useReducedMotion();
 
@@ -130,18 +134,37 @@ export default function BookingExperience() {
   const eta = Math.max(4, Math.round(distanceKm * 1.6 + 3));
   const request = rideRequests.find((ride) => ride.id === requestId) ?? (requestId ? null : rideRequests[0] ?? null);
 
-  function requestRide() {
+  async function requestRide() {
     setError("");
     if (pickup.id === dropoff.id) {
       setError("Choose a different drop-off point so we can plan your trip.");
       return;
     }
+    if (!userId) {
+      setError("Sign in before requesting a ride.");
+      return;
+    }
 
+    setIsSubmitting(true);
     try {
-      const created = saveRideRequest({ pickup, dropoff, distanceKm, fare, category });
+      const created = await requestRideFromServer(pickup.id, dropoff.id, category);
+      cacheServerRideRequest(created, userId);
       setRequestId(created.id);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Could not save this ride request.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function cancelRequest(rideId: string) {
+    if (!userId) return;
+    setError("");
+    try {
+      const updated = await updateRideOnServer(rideId, "cancel");
+      cacheServerRideUpdate(updated, "cancel", userId);
+    } catch (cancelError) {
+      setError(cancelError instanceof Error ? cancelError.message : "Could not cancel this ride request.");
     }
   }
 
@@ -228,10 +251,10 @@ export default function BookingExperience() {
             {error && <motion.p key="booking-error" role="alert" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-200/30 dark:bg-rose-950/40 dark:text-rose-200">{error}</motion.p>}
           </AnimatePresence>
 
-          <motion.button type="button" onClick={requestRide} whileHover={reduceMotion ? undefined : { y: -2, scale: 1.01 }} whileTap={reduceMotion ? undefined : { scale: 0.98 }} className="group mt-5 flex w-full items-center justify-center gap-3 rounded-full bg-emerald-500 px-5 py-4 text-sm font-bold text-zinc-950 shadow-lg shadow-emerald-700/15 transition hover:bg-emerald-400">
-            Request {pricing.label}<motion.span aria-hidden="true" animate={reduceMotion ? undefined : { x: [0, 4, 0] }} transition={{ duration: 1.8, repeat: Infinity }}>↗</motion.span>
+          <motion.button type="button" disabled={isSubmitting || !userId} onClick={() => void requestRide()} whileHover={reduceMotion || isSubmitting || !userId ? undefined : { y: -2, scale: 1.01 }} whileTap={reduceMotion || isSubmitting || !userId ? undefined : { scale: 0.98 }} className="group mt-5 flex w-full items-center justify-center gap-3 rounded-full bg-emerald-500 px-5 py-4 text-sm font-bold text-zinc-950 shadow-lg shadow-emerald-700/15 transition hover:bg-emerald-400 disabled:cursor-wait disabled:opacity-60">
+            {isSubmitting ? "Saving ride…" : `Request ${pricing.label}`}<motion.span aria-hidden="true" animate={reduceMotion || isSubmitting ? undefined : { x: [0, 4, 0] }} transition={{ duration: 1.8, repeat: Infinity }}>↗</motion.span>
           </motion.button>
-          <p className="mt-3 text-center text-[9px] leading-4 text-[var(--muted)]">Demo only: open <Link href="/driver" target="_blank" rel="noreferrer" className="font-bold text-emerald-700 underline decoration-emerald-500/30 underline-offset-2 dark:text-emerald-300">Driver dashboard</Link> in another tab to accept this request. Server-side matching comes with the backend.</p>
+          <p className="mt-3 text-center text-[9px] leading-4 text-[var(--muted)]">Demo only: open <Link href="/driver" target="_blank" rel="noreferrer" className="font-bold text-emerald-700 underline decoration-emerald-500/30 underline-offset-2 dark:text-emerald-300">Driver dashboard</Link> in another tab to accept this request. Requests are saved to your signed-in account.</p>
         </motion.section>
 
         <motion.section initial={reduceMotion ? false : { opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.14, duration: 0.65 }} className="flex min-h-[430px] flex-col overflow-hidden rounded-[26px] border border-[var(--line)] bg-[var(--surface)] shadow-[0_16px_55px_rgba(15,23,18,0.045)] sm:min-h-[550px]">
@@ -263,10 +286,10 @@ export default function BookingExperience() {
                   <p className="text-sm font-bold text-[var(--ink)]">{request.status === "requested" ? "Your ride request is waiting" : request.status === "accepted" ? "A driver accepted your ride" : request.status === "in_progress" ? "You’re on your way" : request.status === "completed" ? "Trip complete — thanks for riding" : request.status === "declined" ? "This driver passed on the request" : "Demo request cancelled"}</p>
                   <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{request.pickup.name} → {request.dropoff.name} · {getRidePricing(request.category).label} · {formatRupees(request.fare)}</p>
                   {request.driver && <p className="mt-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">{request.driver.name} · {request.driver.vehicle} · about {request.driver.pickupEtaMinutes} min away</p>}
-                  <p className="mt-1 text-[9px] font-medium text-[var(--muted)]">Reference {request.id.slice(0, 13)} · demo request stored on this device</p>
+                  <p className="mt-1 text-[9px] font-medium text-[var(--muted)]">Reference {request.id.slice(0, 13)} · saved to your account</p>
                 </div>
               </div>
-              {request.status === "requested" && <motion.button type="button" onClick={() => cancelRideRequest(request.id)} whileHover={reduceMotion ? undefined : { scale: 1.03 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }} className="w-fit rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--muted)] transition hover:text-rose-700">Cancel request</motion.button>}
+              {request.status === "requested" && <motion.button type="button" onClick={() => void cancelRequest(request.id)} whileHover={reduceMotion ? undefined : { scale: 1.03 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }} className="w-fit rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--muted)] transition hover:text-rose-700">Cancel request</motion.button>}
             </div>
           </motion.section>
         )}

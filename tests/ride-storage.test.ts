@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import {
   acceptRideRequest,
+  cacheServerRideRequest,
   cancelRideRequest,
   completeRideRequest,
   markAllRideNotificationsRead,
@@ -72,6 +73,30 @@ test("ride requests persist, follow valid lifecycle transitions, and reject inva
   const finalRides = JSON.parse(storage.getItem("cabbook:ride-requests:v1") ?? "[]");
   assert.equal(finalRides[0].status, "completed");
   assert.deepEqual(finalRides[0].driver, demoDriver);
+});
+
+test("signed-in ride caches use separate account keys and leave legacy rides untouched", () => {
+  const legacyRides = [{ id: "legacy-unclaimed-ride" }];
+  storage.setItem("cabbook:ride-requests:v1", JSON.stringify(legacyRides));
+  const ride = {
+    id: "server-ride-1",
+    createdAt: new Date().toISOString(),
+    pickup,
+    dropoff,
+    distanceKm: 4.2,
+    fare: 110,
+    category: "mini" as const,
+    status: "requested" as const,
+  };
+
+  cacheServerRideRequest(ride, "user/one");
+  cacheServerRideRequest({ ...ride, id: "server-ride-2" }, "user-two");
+
+  assert.equal(JSON.parse(storage.getItem("cabbook:ride-requests:v2:user%2Fone") ?? "[]")[0].id, "server-ride-1");
+  assert.equal(JSON.parse(storage.getItem("cabbook:ride-requests:v2:user-two") ?? "[]")[0].id, "server-ride-2");
+  assert.deepEqual(JSON.parse(storage.getItem("cabbook:ride-requests:v1") ?? "[]"), legacyRides);
+  assert.equal(JSON.parse(storage.getItem("cabbook:notifications:v2:user%2Fone") ?? "[]")[0].rideId, "server-ride-1");
+  assert.equal(JSON.parse(storage.getItem("cabbook:notifications:v2:user-two") ?? "[]")[0].rideId, "server-ride-2");
 });
 
 test("cancellation is limited to pending requests", () => {
