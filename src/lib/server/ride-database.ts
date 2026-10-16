@@ -1,71 +1,62 @@
-import { mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import Database from "better-sqlite3";
+import { and, desc, eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import type { SavedRideRequest } from "@/lib/ride";
+import { rides } from "@/lib/server/schema";
 
-type RideRow = {
-  id: string;
-  user_id: string;
-  created_at: string;
-  status: string;
-  payload: string;
-};
-
-type DatabaseGlobal = typeof globalThis & { cabbookRideDatabase?: Database.Database };
+type ServerDatabase = ReturnType<typeof drizzle>;
+type DatabaseGlobal = typeof globalThis & { cabbookRideDatabase?: ServerDatabase };
 const databaseGlobal = globalThis as DatabaseGlobal;
 
 function getDatabase() {
   if (databaseGlobal.cabbookRideDatabase) return databaseGlobal.cabbookRideDatabase;
 
-  const databasePath = process.env.CABBOOK_DATABASE_PATH ?? join(process.cwd(), "data", "cabbook.sqlite");
-  if (databasePath !== ":memory:") mkdirSync(dirname(databasePath), { recursive: true });
-
-  const database = new Database(databasePath);
-  database.exec(`
-    PRAGMA foreign_keys = ON;
-    PRAGMA journal_mode = WAL;
-    CREATE TABLE IF NOT EXISTS rides (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      status TEXT NOT NULL,
-      payload TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS rides_user_created_idx ON rides (user_id, created_at DESC);
-  `);
-
+  const configuredPath = process.env.CABBOOK_DATABASE_PATH ?? "./data/cabbook.sqlite";
+  const sqlite = new Database(configuredPath);
+  const database = drizzle(sqlite);
+  migrate(database, { migrationsFolder: join(process.cwd(), "drizzle") });
   databaseGlobal.cabbookRideDatabase = database;
   return database;
 }
 
-function hydrateRide(row: RideRow): SavedRideRequest {
-  return JSON.parse(row.payload) as SavedRideRequest;
-}
-
 export function listRidesForUser(userId: string) {
-  const rows = getDatabase()
-    .prepare("SELECT id, user_id, created_at, status, payload FROM rides WHERE user_id = ? ORDER BY created_at DESC LIMIT 100")
-    .all(userId) as unknown as RideRow[];
-  return rows.map(hydrateRide);
+  return getDatabase()
+    .select({ payload: rides.payload })
+    .from(rides)
+    .where(eq(rides.userId, userId))
+    .orderBy(desc(rides.createdAt))
+    .limit(100)
+    .all()
+    .map((row) => JSON.parse(row.payload) as SavedRideRequest);
 }
 
 export function findRideForUser(userId: string, rideId: string) {
   const row = getDatabase()
-    .prepare("SELECT id, user_id, created_at, status, payload FROM rides WHERE user_id = ? AND id = ?")
-    .get(userId, rideId) as RideRow | undefined;
-  return row ? hydrateRide(row) : null;
+    .select({ payload: rides.payload })
+    .from(rides)
+    .where(and(eq(rides.userId, userId), eq(rides.id, rideId)))
+    .get();
+  return row ? JSON.parse(row.payload) as SavedRideRequest : null;
 }
 
 export function createRideForUser(userId: string, ride: SavedRideRequest) {
-  const result = getDatabase()
-    .prepare("INSERT INTO rides (id, user_id, created_at, status, payload) VALUES (?, ?, ?, ?, ?)")
-    .run(ride.id, userId, ride.createdAt, ride.status, JSON.stringify(ride));
-  return Number(result.changes) === 1;
+  getDatabase().insert(rides).values({
+    id: ride.id,
+    userId,
+    createdAt: ride.createdAt,
+    status: ride.status,
+    payload: JSON.stringify(ride),
+  }).run();
+  return true;
 }
 
 export function updateRideForUser(userId: string, ride: SavedRideRequest) {
   const result = getDatabase()
-    .prepare("UPDATE rides SET created_at = ?, status = ?, payload = ? WHERE user_id = ? AND id = ?")
-    .run(ride.createdAt, ride.status, JSON.stringify(ride), userId, ride.id);
-  return Number(result.changes) === 1;
+    .update(rides)
+    .set({ createdAt: ride.createdAt, status: ride.status, payload: JSON.stringify(ride) })
+    .where(and(eq(rides.userId, userId), eq(rides.id, ride.id)))
+    .run();
+  return result.changes === 1;
 }

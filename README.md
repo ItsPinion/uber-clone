@@ -41,7 +41,7 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
   - [x] Restrict reviews to completed rides and allow one review per trip
   - [x] Label reviews as device-local and not sent to drivers
 - [x] **Day 10 — SQLite backend foundation (local prototype)**
-  - [x] Add a file-backed SQLite repository at `data/cabbook.sqlite` (no hosted account or card required)
+  - [x] Add a Drizzle ORM schema and file-backed SQLite database at `data/cabbook.sqlite` (no hosted account or card required)
   - [x] Add Clerk-authenticated, user-scoped ride list/create/update API endpoints; derive ownership from the signed-in session and recompute fare/distance server-side
   - [x] Add in-memory SQLite tests for owner isolation and ride updates
   - [ ] Connect the browser UI to the new API and migrate existing browser-local demo rides
@@ -51,12 +51,15 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
 ## Getting started
 
 ```bash
-npm install
-cp .env.local.example .env.local   # then fill in your Clerk keys
+npm ci
+cp .env.local.example .env.local   # then fill in your Clerk keys locally
+npm run db:migrate                 # create/update data/cabbook.sqlite
 npm run dev                        # http://localhost:3000
 ```
 
-The local SQLite API uses `better-sqlite3` and writes to `data/cabbook.sqlite` (or `CABBOOK_DATABASE_PATH`). The database file is git-ignored. This is intended for local development or a server with a persistent writable disk; ephemeral/serverless deployments need a hosted database or persistent volume. The rider UI still uses browser-local demo storage until the next client-migration step.
+For schema changes, run `npm run db:generate`, then `npm run db:migrate`. `npm run db:studio` opens Drizzle Studio. To use a non-default database file, set `CABBOOK_DATABASE_PATH` in your shell before both the migration and dev commands.
+
+The local SQLite API uses Drizzle ORM with the `better-sqlite3` adapter and writes to `data/cabbook.sqlite` by default (or to `CABBOOK_DATABASE_PATH` if set). The database file is git-ignored. This is intended for local development or a server with a persistent writable disk; ephemeral/serverless deployments need a hosted database or persistent volume. The rider UI still uses browser-local demo storage until the next client-migration step.
 
 ### Clerk setup (one-time)
 
@@ -103,6 +106,8 @@ tests/
 ├─ ride.test.ts                  # Fare, distance, formatting, and offer ranking
 ├─ ride-storage.test.ts          # Ride lifecycle, notifications, and local reviews
 └─ ride-database.test.ts         # SQLite storage and user-isolation checks
+drizzle.config.ts                # Drizzle Kit SQLite configuration
+drizzle/                         # Generated SQL migrations and migration journal
 ```
 
 ## Scripts
@@ -114,3 +119,6 @@ tests/
 | `npm run start` | Serve the production build       |
 | `npm run lint`  | Run ESLint                       |
 | `npm test`      | Run ride logic and storage tests |
+| `npm run db:generate` | Generate a Drizzle SQL migration |
+| `npm run db:migrate` | Apply pending migrations to SQLite |
+| `npm run db:studio` | Open Drizzle Studio for the local database |
