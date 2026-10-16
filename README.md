@@ -1,0 +1,58 @@
+# CabBook — Uber-style Cab Booking App
+
+Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**, **Tailwind CSS v4**, and **Clerk** for authentication.
+
+## Progress
+
+- [x] **Day 1 — Project setup & authentication**
+  - [x] Initialize Next.js project (TypeScript, App Router, `src/` dir, ESLint)
+  - [x] Install and configure Tailwind CSS
+  - [x] Set up Clerk (sign-up, login, social-auth-ready UI)
+  - [x] Route protection via `src/proxy.ts` (public: `/`, `/sign-in`, `/sign-up`)
+- [ ] Day 2 — Database & backend setup
+- [ ] Day 3 — User dashboard & profile
+- [ ] Day 4 — Map & ride request system
+- [ ] Day 5 — Driver dashboard & ride matching
+- [ ] Day 6 — Real-time updates & notifications (optional)
+- [ ] Day 7 — Buffer day & testing
+- [ ] Day 8–14 — Payments, history, reviews, polish, deployment
+
+## Getting started
+
+```bash
+npm install
+cp .env.local.example .env.local   # then fill in your Clerk keys
+npm run dev                        # http://localhost:3000
+```
+
+### Clerk setup (one-time)
+
+1. Create an application at <https://dashboard.clerk.com>.
+2. Copy the **Publishable key** and **Secret key** into `.env.local`.
+3. Under **User & Authentication → Social connections**, enable the providers you want (e.g. Google, GitHub). The `<SignIn />` and `<SignUp />` components pick them up automatically.
+4. Under **Configure → Paths** (or via the env vars), sign-in/up URLs are `/sign-in` and `/sign-up`; after auth users land on `/dashboard`.
+
+## Project structure (Day 1)
+
+```
+src/
+├─ app/
+│  ├─ layout.tsx                 # ClerkProvider + global navbar
+│  ├─ page.tsx                   # Public landing page
+│  ├─ globals.css                # Tailwind CSS entry
+│  ├─ sign-in/[[...sign-in]]/page.tsx
+│  ├─ sign-up/[[...sign-up]]/page.tsx
+│  └─ dashboard/page.tsx         # Protected placeholder (filled in on Day 3)
+├─ components/
+│  └─ Navbar.tsx                 # Log in / Sign up / Dashboard / UserButton
+└─ proxy.ts                     # Clerk middleware (Next.js 16 "proxy" file)
+```
+
+## Scripts
+
+| Command         | What it does                     |
+| --------------- | -------------------------------- |
+| `npm run dev`   | Start the dev server             |
+| `npm run build` | Production build                 |
+| `npm run start` | Serve the production build       |
+| `npm run lint`  | Run ESLint                       |
