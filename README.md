@@ -20,7 +20,11 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
   - [x] Save demo ride requests in browser storage, with cancel and reference states
   - [x] Add a Google Maps route view when `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is configured; show the interactive map illustration otherwise
   - [ ] Connect requests and live route/fare estimates to a backend after the Day 2 database is selected
-- [ ] Day 5 — Driver dashboard & ride matching
+- [ ] **Day 5 — Driver dashboard & ride matching**
+  - [x] Add a protected driver view with online/offline state and a nearby-request queue
+  - [x] Rank demo offers by estimated pickup distance; accept or pass on requests
+  - [x] Add accepted → in-progress → completed trip actions with same-browser-tab updates
+  - [ ] Replace browser-local demo matching with authenticated, server-side driver matching after Day 2 backend setup
 - [ ] Day 6 — Real-time updates & notifications (optional)
 - [ ] Day 7 — Buffer day & testing
 - [ ] Day 8–14 — Payments, history, reviews, polish, deployment
@@ -41,7 +45,7 @@ npm run dev                        # http://localhost:3000
 4. Under **Configure → Paths** (or via the env vars), sign-in/up URLs are `/sign-in` and `/sign-up`; after auth users land on `/dashboard`.
 5. To use profile editing, allow name updates in the Clerk profile settings. To verify phone numbers, enable phone-number sign-in/verification and SMS delivery in the Clerk Dashboard.
 
-## Project structure (through Day 4 prototype)
+## Project structure (through Day 5 prototype)
 
 ```
 src/
@@ -53,13 +57,18 @@ src/
 │  ├─ sign-up/[[...sign-up]]/page.tsx
 │  ├─ dashboard/page.tsx         # Rider dashboard
 │  ├─ profile/page.tsx           # Protected profile settings
-│  └─ book/page.tsx              # Protected ride planner
+│  ├─ book/page.tsx              # Protected ride planner
+│  └─ driver/page.tsx            # Protected demo driver dashboard
 ├─ components/
 │  ├─ Navbar.tsx                 # Auth controls and signed-in navigation
 │  ├─ ProfileEditor.tsx          # Name, phone verification, and photo editor
 │  ├─ BookingExperience.tsx      # Stops, ride choice, fare, and demo request
 │  ├─ RideMap.tsx                # Google Maps view or interactive local map
-│  └─ GoogleMapsView.tsx         # Optional live Google Maps integration
+│  ├─ GoogleMapsView.tsx         # Optional live Google Maps integration
+│  └─ DriverExperience.tsx       # Demo ride matching and lifecycle controls
+├─ lib/
+│  ├─ ride.ts                    # Locations, fare estimates, and offer ranking
+│  └─ ride-storage.ts            # Same-origin demo ride state
 └─ proxy.ts                      # Clerk middleware (Next.js 16 "proxy" file)
 ```
 

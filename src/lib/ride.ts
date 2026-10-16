@@ -7,6 +7,14 @@ export type RideLocation = {
 };
 
 export type RideCategory = "mini" | "comfort" | "xl";
+export type RideStatus = "requested" | "accepted" | "in_progress" | "completed" | "declined" | "cancelled";
+
+export type DemoDriver = {
+  name: string;
+  vehicle: string;
+  plate: string;
+  pickupEtaMinutes: number;
+};
 
 export type SavedRideRequest = {
   id: string;
@@ -16,7 +24,8 @@ export type SavedRideRequest = {
   distanceKm: number;
   fare: number;
   category: RideCategory;
-  status: "requested" | "cancelled";
+  status: RideStatus;
+  driver?: DemoDriver;
 };
 
 export const VIZAG_LOCATIONS: RideLocation[] = [
@@ -28,6 +37,8 @@ export const VIZAG_LOCATIONS: RideLocation[] = [
   { id: "simhachalam", name: "Simhachalam Temple", area: "Simhachalam", lat: 17.765, lng: 83.202 },
   { id: "steel-plant", name: "Steel Plant Gate", area: "Ukkunagaram", lat: 17.626, lng: 83.136 },
 ];
+
+export const DEMO_DRIVER_LOCATION: RideLocation = VIZAG_LOCATIONS[0];
 
 const RIDE_PRICING: Record<RideCategory, { baseFare: number; perKm: number; label: string; capacity: string }> = {
   mini: { baseFare: 45, perKm: 15, label: "CabBook Mini", capacity: "1–3 seats" },
@@ -53,6 +64,17 @@ export function calculateDistanceKm(origin: RideLocation, destination: RideLocat
 
   // Allow a modest detour factor as a route estimate until a routing API is configured.
   return Math.max(1, Math.round(straightLineKm * 1.28 * 10) / 10);
+}
+
+export function rankRideOffers(requests: SavedRideRequest[], driverLocation: RideLocation) {
+  return requests
+    .filter((ride) => ride.status === "requested")
+    .map((ride) => ({
+      ride,
+      pickupDistanceKm: calculateDistanceKm(driverLocation, ride.pickup),
+      pickupEtaMinutes: Math.max(3, Math.ceil(calculateDistanceKm(driverLocation, ride.pickup) * 3 + 2)),
+    }))
+    .sort((first, second) => first.pickupDistanceKm - second.pickupDistanceKm);
 }
 
 export function estimateFare(distanceKm: number, category: RideCategory) {

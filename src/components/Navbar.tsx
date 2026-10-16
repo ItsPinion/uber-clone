@@ -73,6 +73,14 @@ export default function Navbar() {
                 {pathname === "/book" && <motion.span layoutId="nav-active-indicator" transition={{ type: "spring", stiffness: 360, damping: 30 }} className="absolute inset-0 z-0 rounded-full bg-emerald-500/10" />}
                 <span className="relative z-10">Book</span>
               </Link>
+              <Link
+                href="/driver"
+                aria-current={pathname === "/driver" ? "page" : undefined}
+                className="nav-link relative rounded-full px-4 py-2 text-xs font-semibold"
+              >
+                {pathname === "/driver" && <motion.span layoutId="nav-active-indicator" transition={{ type: "spring", stiffness: 360, damping: 30 }} className="absolute inset-0 z-0 rounded-full bg-emerald-500/10" />}
+                <span className="relative z-10">Drive</span>
+              </Link>
             </div>
           </Show>
 
@@ -101,8 +109,8 @@ export default function Navbar() {
 
           <Show when="signed-in">
             <div className="flex items-center gap-2 sm:gap-3">
-              <Link href="/dashboard" aria-current={pathname === "/dashboard" ? "page" : undefined} className="mobile-nav-link sm:hidden">Home</Link>
               <Link href="/book" aria-current={pathname === "/book" ? "page" : undefined} className="mobile-nav-link sm:hidden">Ride</Link>
+              <Link href="/driver" aria-current={pathname === "/driver" ? "page" : undefined} className="mobile-nav-link sm:hidden">Drive</Link>
               <UserButton />
             </div>
           </Show>

@@ -129,7 +129,7 @@ export default function BookingExperience() {
           <motion.button type="button" onClick={requestRide} whileHover={reduceMotion ? undefined : { y: -2, scale: 1.01 }} whileTap={reduceMotion ? undefined : { scale: 0.98 }} className="group mt-5 flex w-full items-center justify-center gap-3 rounded-full bg-emerald-500 px-5 py-4 text-sm font-bold text-zinc-950 shadow-lg shadow-emerald-700/15 transition hover:bg-emerald-400">
             Request {pricing.label}<motion.span aria-hidden="true" animate={reduceMotion ? undefined : { x: [0, 4, 0] }} transition={{ duration: 1.8, repeat: Infinity }}>↗</motion.span>
           </motion.button>
-          <p className="mt-3 text-center text-[9px] leading-4 text-[var(--muted)]">Demo requests are saved in this browser. Driver matching and online booking need the Day 2 backend.</p>
+          <p className="mt-3 text-center text-[9px] leading-4 text-[var(--muted)]">Demo only: open <Link href="/driver" target="_blank" rel="noreferrer" className="font-bold text-emerald-700 underline decoration-emerald-500/30 underline-offset-2 dark:text-emerald-300">Driver dashboard</Link> in another tab to accept this request. Server-side matching comes with the backend.</p>
         </motion.section>
 
         <motion.section initial={reduceMotion ? false : { opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.14, duration: 0.65 }} className="flex min-h-[430px] flex-col overflow-hidden rounded-[26px] border border-[var(--line)] bg-[var(--surface)] shadow-[0_16px_55px_rgba(15,23,18,0.045)] sm:min-h-[550px]">
@@ -158,9 +158,10 @@ export default function BookingExperience() {
               <div className="flex items-start gap-3">
                 <motion.span animate={reduceMotion ? undefined : { scale: [1, 1.12, 1], rotate: [0, 5, 0] }} transition={{ duration: 2.6, repeat: Infinity }} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-lg text-zinc-950">✓</motion.span>
                 <div>
-                  <p className="text-sm font-bold text-[var(--ink)]">{request.status === "cancelled" ? "Demo request cancelled" : "Your demo request is saved"}</p>
+                  <p className="text-sm font-bold text-[var(--ink)]">{request.status === "requested" ? "Your ride request is waiting" : request.status === "accepted" ? "A driver accepted your ride" : request.status === "in_progress" ? "You’re on your way" : request.status === "completed" ? "Trip complete — thanks for riding" : request.status === "declined" ? "This driver passed on the request" : "Demo request cancelled"}</p>
                   <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{request.pickup.name} → {request.dropoff.name} · {getRidePricing(request.category).label} · {formatRupees(request.fare)}</p>
-                  <p className="mt-1 text-[9px] font-medium text-[var(--muted)]">Reference {request.id.slice(0, 13)} · saved on this device only</p>
+                  {request.driver && <p className="mt-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">{request.driver.name} · {request.driver.vehicle} · about {request.driver.pickupEtaMinutes} min away</p>}
+                  <p className="mt-1 text-[9px] font-medium text-[var(--muted)]">Reference {request.id.slice(0, 13)} · demo request stored on this device</p>
                 </div>
               </div>
               {request.status === "requested" && <motion.button type="button" onClick={() => cancelRideRequest(request.id)} whileHover={reduceMotion ? undefined : { scale: 1.03 }} whileTap={reduceMotion ? undefined : { scale: 0.97 }} className="w-fit rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--muted)] transition hover:text-rose-700">Cancel request</motion.button>}

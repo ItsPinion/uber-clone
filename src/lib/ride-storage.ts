@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import type { RideLocation, RideCategory, SavedRideRequest } from "@/lib/ride";
+import type { DemoDriver, RideLocation, RideCategory, RideStatus, SavedRideRequest } from "@/lib/ride";
 
 const STORAGE_KEY = "cabbook:ride-requests:v1";
 const CHANGE_EVENT = "cabbook:ride-requests-change";
@@ -41,7 +41,7 @@ export function useRideRequests() {
   return useSyncExternalStore(subscribeToRides, getRidesSnapshot, () => EMPTY_RIDES);
 }
 
-export function saveRideRequest(request: Omit<SavedRideRequest, "id" | "createdAt" | "status">) {
+export function saveRideRequest(request: Omit<SavedRideRequest, "id" | "createdAt" | "status" | "driver">) {
   const nextRide: SavedRideRequest = {
     ...request,
     id: globalThis.crypto?.randomUUID?.() ?? `ride-${Date.now()}`,
@@ -54,10 +54,42 @@ export function saveRideRequest(request: Omit<SavedRideRequest, "id" | "createdA
 }
 
 export function cancelRideRequest(rideId: string) {
-  const nextList = getRidesSnapshot().map((ride) =>
-    ride.id === rideId ? { ...ride, status: "cancelled" as const } : ride,
+  updateRideRequest(rideId, "cancelled", ["requested"]);
+}
+
+export function declineRideRequest(rideId: string) {
+  updateRideRequest(rideId, "declined", ["requested"]);
+}
+
+export function acceptRideRequest(rideId: string, driver: DemoDriver) {
+  return updateRideRequest(rideId, "accepted", ["requested"], driver);
+}
+
+export function startRideRequest(rideId: string) {
+  return updateRideRequest(rideId, "in_progress", ["accepted"]);
+}
+
+export function completeRideRequest(rideId: string) {
+  return updateRideRequest(rideId, "completed", ["in_progress"]);
+}
+
+function updateRideRequest(
+  rideId: string,
+  status: RideStatus,
+  allowedCurrentStatuses: RideStatus[],
+  driver?: DemoDriver,
+) {
+  const rides = getRidesSnapshot();
+  const currentRide = rides.find((ride) => ride.id === rideId);
+  if (!currentRide || !allowedCurrentStatuses.includes(currentRide.status)) return false;
+
+  const nextRides = rides.map((ride) =>
+    ride.id === rideId
+      ? { ...ride, status, ...(driver ? { driver } : {}) }
+      : ride,
   );
-  persistRides(nextList);
+  persistRides(nextRides);
+  return true;
 }
 
 function persistRides(rides: SavedRideRequest[]) {
@@ -67,8 +99,8 @@ function persistRides(rides: SavedRideRequest[]) {
     window.localStorage.setItem(STORAGE_KEY, cachedRawValue);
     window.dispatchEvent(new Event(CHANGE_EVENT));
   } catch {
-    throw new Error("This browser could not save the ride request. Check that local storage is available.");
+    throw new Error("This browser could not save the ride update. Check that local storage is available.");
   }
 }
 
-export type { RideLocation, RideCategory, SavedRideRequest };
+export type { RideLocation, RideCategory, SavedRideRequest, RideStatus, DemoDriver };
