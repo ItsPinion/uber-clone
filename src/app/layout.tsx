@@ -26,6 +26,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <html
         lang="en"
         className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+        // Browser extensions (e.g. Dark Reader) add attributes to <html> before React hydrates.
+        suppressHydrationWarning
       >
         <body className="flex min-h-full flex-col bg-zinc-50 text-zinc-900">
           <Suspense fallback={<div className="h-[61px] border-b border-zinc-200 bg-white" />}>
