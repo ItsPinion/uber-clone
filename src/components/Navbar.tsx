@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import { motion, useReducedMotion } from "motion/react";
 import ThemeToggle from "@/components/ThemeToggle";
+import NotificationBell from "@/components/NotificationBell";
 
 export default function Navbar() {
   const reduceMotion = useReducedMotion();
@@ -84,6 +85,9 @@ export default function Navbar() {
             </div>
           </Show>
 
+          <Show when="signed-in">
+            <NotificationBell />
+          </Show>
           <ThemeToggle />
 
           <Show when="signed-out">
