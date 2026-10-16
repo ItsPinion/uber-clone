@@ -48,8 +48,11 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
   - [x] Connect booking, cancellation, demo driver lifecycle, ride history, and reviews to authenticated, owner-scoped ride endpoints
   - [x] Keep notifications browser-local and synchronized between same-origin tabs, namespaced per signed-in user
   - [x] Leave legacy unscoped browser rides untouched and unimported to avoid assigning one person's location history to another account
-- [ ] Days 12–14 — Payments, polish, deployment
-  - [ ] Keep payment processing deferred until a server-backed provider and deployment database strategy are selected; never store card details in the browser
+- [x] **Day 12 — Ride freshness & payment guardrails**
+  - [x] Refresh the signed-in ride list when a page becomes visible or regains focus, so server changes show across devices without a manual reload
+  - [x] State clearly that fares are estimates and no payment is collected; do not request or store card details
+  - [x] Defer real payment processing until a server-backed provider and deployment database strategy are selected
+- [ ] Days 13–14 — Deployment readiness and final polish
 
 ## Getting started
 
@@ -72,7 +75,7 @@ The local SQLite API uses Drizzle ORM with the `better-sqlite3` adapter and writ
 4. Under **Configure → Paths** (or via the env vars), sign-in/up URLs are `/sign-in` and `/sign-up`; after auth users land on `/dashboard`.
 5. To use profile editing, allow name updates in the Clerk profile settings. To verify phone numbers, enable phone-number sign-in/verification and SMS delivery in the Clerk Dashboard.
 
-## Project structure (through Day 11)
+## Project structure (through Day 12)
 
 ```
 src/

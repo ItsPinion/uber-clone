@@ -17,7 +17,7 @@ let cachedNotificationsKey: string | null = null;
 let cachedNotificationsRaw: string | null = null;
 let cachedNotifications: RideNotification[] = EMPTY_NOTIFICATIONS;
 let syncChannel: BroadcastChannel | null = null;
-const serverHydrationStarted = new Set<string>();
+const serverRefreshes = new Map<string, Promise<void>>();
 const localRideMutations = new Map<string, Map<string, number>>();
 let rideMutationSequence = 0;
 
@@ -113,12 +113,29 @@ export function useRideRequests() {
     () => EMPTY_RIDES,
   );
   useEffect(() => {
-    if (userId && !serverHydrationStarted.has(userId)) {
-      serverHydrationStarted.add(userId);
-      void hydrateRideRequestsFromServer(userId);
-    }
+    if (!userId) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void refreshRideRequestsFromServer(userId);
+    };
+    void refreshRideRequestsFromServer(userId);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [userId]);
   return rides;
+}
+
+function refreshRideRequestsFromServer(userId: string) {
+  const inFlight = serverRefreshes.get(userId);
+  if (inFlight) return inFlight;
+  const refresh = hydrateRideRequestsFromServer(userId).finally(() => {
+    if (serverRefreshes.get(userId) === refresh) serverRefreshes.delete(userId);
+  });
+  serverRefreshes.set(userId, refresh);
+  return refresh;
 }
 
 async function hydrateRideRequestsFromServer(userId: string) {
@@ -126,13 +143,10 @@ async function hydrateRideRequestsFromServer(userId: string) {
   try {
     const response = await fetch("/api/rides", { cache: "no-store" });
     const payload = await response.json().catch(() => null) as { rides?: SavedRideRequest[] } | null;
-    if (!response.ok || !payload || !Array.isArray(payload.rides)) {
-      serverHydrationStarted.delete(userId);
-      return;
-    }
+    if (!response.ok || !payload || !Array.isArray(payload.rides)) return;
     replaceRideRequestsFromServer(payload.rides, userId, mutationSequenceAtStart);
   } catch {
-    serverHydrationStarted.delete(userId);
+    // Keep the account-scoped local cache available if the API is temporarily offline.
   }
 }
 
