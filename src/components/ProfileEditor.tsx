@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useUser } from "@clerk/nextjs";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 type ClerkUser = NonNullable<ReturnType<typeof useUser>["user"]>;
 type PhoneResource = Awaited<ReturnType<ClerkUser["createPhoneNumber"]>>;
@@ -27,6 +28,7 @@ function ProfileForm({ user }: { user: ClerkUser }) {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const phoneResource = useRef<PhoneResource | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const reduceMotion = useReducedMotion();
 
   const showError = (value: unknown) => {
     setMessage("");
@@ -157,10 +159,27 @@ function ProfileForm({ user }: { user: ClerkUser }) {
   const phoneIsVerified = user.primaryPhoneNumber?.verification.status === "verified";
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[0.8fr_1.4fr]">
-      <aside className="h-fit rounded-3xl bg-zinc-950 p-6 text-white shadow-sm sm:p-7">
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0, y: 22, filter: "blur(5px)" }}
+      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+      className="grid gap-6 lg:grid-cols-[0.8fr_1.4fr]"
+    >
+      <motion.aside
+        initial={reduceMotion ? false : { opacity: 0, x: -18 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.08, duration: 0.65 }}
+        whileHover={reduceMotion ? undefined : { y: -3 }}
+        className="h-fit rounded-3xl bg-zinc-950 p-6 text-white shadow-sm sm:p-7"
+      >
         <div className="flex items-center gap-4">
-          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-white/15 bg-zinc-800">
+          <motion.div
+            initial={reduceMotion ? false : { scale: 0.8, rotate: -8, opacity: 0 }}
+            animate={{ scale: 1, rotate: 0, opacity: 1 }}
+            whileHover={reduceMotion ? undefined : { scale: 1.08, rotate: 4 }}
+            transition={{ type: "spring", stiffness: 240, damping: 18 }}
+            className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-white/15 bg-zinc-800"
+          >
             <Image
               src={user.imageUrl}
               alt={`${user.fullName ?? "Rider"} profile photo`}
@@ -169,7 +188,7 @@ function ProfileForm({ user }: { user: ClerkUser }) {
               unoptimized
               className="object-cover"
             />
-          </div>
+          </motion.div>
           <div className="min-w-0">
             <p className="truncate text-lg font-semibold">{user.fullName ?? "Your profile"}</p>
             <p className="mt-1 truncate text-sm text-zinc-400">{email}</p>
@@ -200,21 +219,28 @@ function ProfileForm({ user }: { user: ClerkUser }) {
             Profile changes are saved securely to your signed-in account.
           </p>
         </div>
-      </aside>
+      </motion.aside>
 
-      <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
+      <motion.div
+        initial={reduceMotion ? false : { opacity: 0, x: 18 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.15, duration: 0.7 }}
+        className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8"
+      >
         <div className="flex flex-col justify-between gap-5 border-b border-zinc-100 pb-6 sm:flex-row sm:items-center">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Personal details</p>
             <h2 className="mt-2 text-xl font-bold tracking-tight text-zinc-950">Your rider profile</h2>
             <p className="mt-1 text-sm text-zinc-500">Make sure your details are current before your first ride.</p>
           </div>
-          <label
+          <motion.label
             htmlFor="profile-photo"
+            whileHover={reduceMotion || isUploadingPhoto ? undefined : { y: -2, scale: 1.025 }}
+            whileTap={reduceMotion || isUploadingPhoto ? undefined : { scale: 0.97 }}
             className={`inline-flex w-fit cursor-pointer items-center justify-center rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 ${isUploadingPhoto ? "pointer-events-none opacity-60" : ""}`}
           >
             {isUploadingPhoto ? "Uploading…" : "Change photo"}
-          </label>
+          </motion.label>
           <input
             ref={fileInput}
             id="profile-photo"
@@ -281,8 +307,16 @@ function ProfileForm({ user }: { user: ClerkUser }) {
               )}
             </div>
 
-            {phoneStep === "edit" ? (
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <AnimatePresence mode="wait" initial={false}>
+              {phoneStep === "edit" ? (
+              <motion.div
+                key="phone-edit"
+                initial={reduceMotion ? false : { opacity: 0, x: -12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 12 }}
+                transition={{ duration: 0.2 }}
+                className="mt-4 flex flex-col gap-3 sm:flex-row"
+              >
                 <input
                   type="tel"
                   autoComplete="tel"
@@ -293,17 +327,27 @@ function ProfileForm({ user }: { user: ClerkUser }) {
                   placeholder="+91 98765 43210"
                   aria-label="Phone number with country code"
                 />
-                <button
+                <motion.button
                   type="button"
                   onClick={startPhoneVerification}
                   disabled={isSendingCode || !phone.trim()}
+                  whileHover={reduceMotion ? undefined : { y: -2 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                   className="shrink-0 rounded-xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isSendingCode ? "Sending code…" : phoneIsVerified ? "Update number" : "Verify number"}
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={verifyPhone} className="mt-4 flex flex-col gap-3 sm:flex-row">
+                </motion.button>
+              </motion.div>
+              ) : (
+              <motion.form
+                key="phone-verify"
+                onSubmit={verifyPhone}
+                initial={reduceMotion ? false : { opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                transition={{ duration: 0.2 }}
+                className="mt-4 flex flex-col gap-3 sm:flex-row"
+              >
                 <input
                   type="text"
                   autoComplete="one-time-code"
@@ -315,13 +359,15 @@ function ProfileForm({ user }: { user: ClerkUser }) {
                   placeholder="SMS verification code"
                   aria-label="SMS verification code"
                 />
-                <button
+                <motion.button
                   type="submit"
                   disabled={isVerifying || !verificationCode.trim()}
+                  whileHover={reduceMotion ? undefined : { y: -2 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                   className="shrink-0 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isVerifying ? "Verifying…" : "Confirm code"}
-                </button>
+                </motion.button>
                 <button
                   type="button"
                   onClick={() => {
@@ -335,34 +381,44 @@ function ProfileForm({ user }: { user: ClerkUser }) {
                 >
                   Change
                 </button>
-              </form>
-            )}
+              </motion.form>
+              )}
+            </AnimatePresence>
           </section>
 
-          {(error || message) && (
-            <div
-              role={error ? "alert" : "status"}
-              aria-live="polite"
-              className={`rounded-xl px-4 py-3 text-sm ${error ? "border border-rose-200 bg-rose-50 text-rose-800" : "border border-emerald-200 bg-emerald-50 text-emerald-800"}`}
-            >
-              {error || message}
-            </div>
-          )}
+          <AnimatePresence mode="wait" initial={false}>
+            {(error || message) && (
+              <motion.div
+                key={error ? "profile-error" : "profile-success"}
+                initial={reduceMotion ? false : { opacity: 0, y: 10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                transition={{ duration: 0.24, ease: "easeOut" }}
+                role={error ? "alert" : "status"}
+                aria-live="polite"
+                className={`rounded-xl px-4 py-3 text-sm ${error ? "border border-rose-200 bg-rose-50 text-rose-800" : "border border-emerald-200 bg-emerald-50 text-emerald-800"}`}
+              >
+                {error || message}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="flex flex-col-reverse gap-3 border-t border-zinc-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-zinc-500">Your email address can&apos;t be changed here.</p>
-            <button
+            <motion.button
               type="button"
               onClick={saveProfile}
               disabled={isSaving || isSendingCode || isVerifying || isUploadingPhoto}
+              whileHover={reduceMotion || isSaving ? undefined : { y: -2, scale: 1.015 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
               className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-700/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving ? "Saving changes…" : "Save changes"}
-            </button>
+            </motion.button>
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

@@ -1,6 +1,6 @@
 # CabBook — Uber-style Cab Booking App
 
-Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**, **Tailwind CSS v4**, and **Clerk** for authentication.
+Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**, **Tailwind CSS v4**, and **Clerk** for authentication. The interface uses **Motion for React** for interaction and reveal animations, plus **next-themes** for persistent light/dark mode.
 
 ## Progress
 

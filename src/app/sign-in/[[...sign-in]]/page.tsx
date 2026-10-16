@@ -1,12 +1,17 @@
 import { Suspense } from "react";
 import { SignIn } from "@clerk/nextjs";
+import AuthFrame from "@/components/AuthFrame";
 
 export default function SignInPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-12">
-      <Suspense fallback={<div className="h-[480px] w-full max-w-md animate-pulse rounded-2xl bg-zinc-200" />}>
+    <AuthFrame
+      eyebrow="Welcome back"
+      title="The city is still yours."
+      detail="Sign in to pick up where you left off. Your next great day is only a ride away."
+    >
+      <Suspense fallback={<div className="h-[480px] w-full animate-pulse rounded-2xl bg-[var(--surface-2)]" />}>
         <SignIn />
       </Suspense>
-    </main>
+    </AuthFrame>
   );
 }
