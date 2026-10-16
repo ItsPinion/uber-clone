@@ -1,10 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import type { RideLocation } from "@/lib/ride";
 
-const GoogleMapsView = dynamic(() => import("@/components/GoogleMapsView"), {
+const OpenStreetMapView = dynamic(() => import("@/components/OpenStreetMapView"), {
   ssr: false,
   loading: () => <div className="h-full w-full animate-pulse bg-[var(--surface-2)]" />,
 });
@@ -90,11 +91,18 @@ function MapIllustration({ pickup, dropoff }: { pickup: RideLocation; dropoff: R
 }
 
 export default function RideMap({ pickup, dropoff }: { pickup: RideLocation; dropoff: RideLocation }) {
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const [useOfflineMap, setUseOfflineMap] = useState(false);
 
-  if (apiKey) {
-    return <GoogleMapsView apiKey={apiKey} pickup={pickup} dropoff={dropoff} />;
+  if (useOfflineMap) {
+    return (
+      <div className="relative h-full w-full">
+        <MapIllustration pickup={pickup} dropoff={dropoff} />
+        <button type="button" onClick={() => setUseOfflineMap(false)} className="absolute right-4 top-4 z-10 rounded-full border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-[9px] font-bold text-[var(--ink)] shadow-sm transition hover:border-emerald-500/50">
+          Switch to OpenStreetMap
+        </button>
+      </div>
+    );
   }
 
-  return <MapIllustration pickup={pickup} dropoff={dropoff} />;
+  return <OpenStreetMapView pickup={pickup} dropoff={dropoff} onUseIllustration={() => setUseOfflineMap(true)} />;
 }

@@ -18,7 +18,7 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
 - [ ] **Day 4 — Map & ride request system**
   - [x] Add Visakhapatnam pickup/drop-off selection, route preview, ride categories, and INR fare estimates
   - [x] Save demo ride requests in browser storage, with cancel and reference states
-  - [x] Add a Google Maps route view when `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is configured; show the interactive map illustration otherwise
+  - [x] Use OpenStreetMap tiles without an API key or credit card, with an offline illustration fallback and an approximate route overlay
   - [ ] Connect requests and live route/fare estimates to a backend after the Day 2 database is selected
 - [ ] **Day 5 — Driver dashboard & ride matching**
   - [x] Add a protected driver view with online/offline state and a nearby-request queue
@@ -75,8 +75,8 @@ src/
 │  ├─ Navbar.tsx                 # Auth controls and signed-in navigation
 │  ├─ ProfileEditor.tsx          # Name, phone verification, and photo editor
 │  ├─ BookingExperience.tsx      # Stops, ride choice, fare, and demo request
-│  ├─ RideMap.tsx                # Google Maps view or interactive local map
-│  ├─ GoogleMapsView.tsx         # Optional live Google Maps integration
+│  ├─ RideMap.tsx                # OpenStreetMap with offline illustration fallback
+│  ├─ OpenStreetMapView.tsx      # Leaflet tiles, route line, and pickup markers
 │  ├─ DriverExperience.tsx       # Demo ride matching and lifecycle controls
 │  ├─ NotificationBell.tsx       # Cross-tab in-app ride notification center
 │  ├─ DashboardRideSummary.tsx   # Live dashboard ride counts and recent requests
