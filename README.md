@@ -29,7 +29,9 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
   - [x] Broadcast ride state changes between same-origin tabs with BroadcastChannel and a storage-event fallback
   - [x] Add an animated in-app notification center for requests, driver matches, cancellations, and trip status
   - [ ] Replace browser-local events with server-backed WebSockets/Firebase and push notifications after Day 2 backend setup
-- [ ] Day 7 — Buffer day & testing
+- [x] **Day 7 — Buffer day & testing**
+  - [x] Add unit coverage for ride distance/fare formatting, driver offer ranking, ride lifecycle transitions, and in-app notifications
+  - [x] Run lint, unit tests, and production builds in GitHub Actions for pushes and pull requests
 - [ ] Day 8–14 — Payments, history, reviews, polish, deployment
 
 ## Getting started
@@ -48,7 +50,7 @@ npm run dev                        # http://localhost:3000
 4. Under **Configure → Paths** (or via the env vars), sign-in/up URLs are `/sign-in` and `/sign-up`; after auth users land on `/dashboard`.
 5. To use profile editing, allow name updates in the Clerk profile settings. To verify phone numbers, enable phone-number sign-in/verification and SMS delivery in the Clerk Dashboard.
 
-## Project structure (through Day 6 prototype)
+## Project structure (through Day 7 prototype)
 
 ```
 src/
@@ -74,6 +76,9 @@ src/
 │  ├─ ride.ts                    # Locations, fare estimates, and offer ranking
 │  └─ ride-storage.ts            # Same-origin rides, notifications, and sync
 └─ proxy.ts                      # Clerk middleware (Next.js 16 "proxy" file)
+tests/
+├─ ride.test.ts                  # Fare, distance, formatting, and offer ranking
+└─ ride-storage.test.ts          # Demo ride lifecycle and notification persistence
 ```
 
 ## Scripts
@@ -84,3 +89,4 @@ src/
 | `npm run build` | Production build                 |
 | `npm run start` | Serve the production build       |
 | `npm run lint`  | Run ESLint                       |
+| `npm test`      | Run ride logic and storage tests |
