@@ -26,9 +26,15 @@ export default function Navbar() {
           <Show when="signed-in">
             <Link
               href="/dashboard"
-              className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
             >
               Dashboard
+            </Link>
+            <Link
+              href="/profile"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+            >
+              Profile
             </Link>
             <UserButton />
           </Show>

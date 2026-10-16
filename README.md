@@ -10,7 +10,11 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
   - [x] Set up Clerk (sign-up, login, social-auth-ready UI)
   - [x] Route protection via `src/proxy.ts` (public: `/`, `/sign-in`, `/sign-up`)
 - [ ] Day 2 — Database & backend setup
-- [ ] Day 3 — User dashboard & profile
+- [x] **Day 3 — User dashboard & profile**
+  - [x] Build a responsive rider dashboard with account overview and empty ride-history states
+  - [x] Add profile editing for name and profile photo using Clerk
+  - [x] Add phone-number setup with SMS verification
+  - [x] Protect the profile route through the existing Clerk proxy
 - [ ] Day 4 — Map & ride request system
 - [ ] Day 5 — Driver dashboard & ride matching
 - [ ] Day 6 — Real-time updates & notifications (optional)
@@ -31,8 +35,9 @@ npm run dev                        # http://localhost:3000
 2. Copy the **Publishable key** and **Secret key** into `.env.local`.
 3. Under **User & Authentication → Social connections**, enable the providers you want (e.g. Google, GitHub). The `<SignIn />` and `<SignUp />` components pick them up automatically.
 4. Under **Configure → Paths** (or via the env vars), sign-in/up URLs are `/sign-in` and `/sign-up`; after auth users land on `/dashboard`.
+5. To use profile editing, allow name updates in the Clerk profile settings. To verify phone numbers, enable phone-number sign-in/verification and SMS delivery in the Clerk Dashboard.
 
-## Project structure (Day 1)
+## Project structure (through Day 3)
 
 ```
 src/
@@ -42,10 +47,12 @@ src/
 │  ├─ globals.css                # Tailwind CSS entry
 │  ├─ sign-in/[[...sign-in]]/page.tsx
 │  ├─ sign-up/[[...sign-up]]/page.tsx
-│  └─ dashboard/page.tsx         # Protected placeholder (filled in on Day 3)
+│  ├─ dashboard/page.tsx         # Rider dashboard
+│  └─ profile/page.tsx           # Protected profile settings
 ├─ components/
-│  └─ Navbar.tsx                 # Log in / Sign up / Dashboard / UserButton
-└─ proxy.ts                     # Clerk middleware (Next.js 16 "proxy" file)
+│  ├─ Navbar.tsx                 # Auth controls and signed-in navigation
+│  └─ ProfileEditor.tsx          # Name, phone verification, and photo editor
+└─ proxy.ts                      # Clerk middleware (Next.js 16 "proxy" file)
 ```
 
 ## Scripts
