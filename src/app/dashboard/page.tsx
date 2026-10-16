@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { currentUser } from "@clerk/nextjs/server";
-import { HoverLift, Reveal, Stagger, StaggerItem } from "@/components/MotionPrimitives";
+import { Reveal } from "@/components/MotionPrimitives";
+import DashboardRideSummary from "@/components/DashboardRideSummary";
 
 function getInitials(name: string) {
   return name
@@ -71,46 +72,9 @@ async function DashboardContent() {
         </section>
       </Reveal>
 
-      <Stagger className="mt-4 grid gap-3 sm:grid-cols-3 sm:gap-4">
-        {[
-          { label: "Trips taken", value: "00", note: "Your first ride is waiting", icon: "↗" },
-          { label: "Next pickup", value: "—", note: "No ride scheduled", icon: "⌖" },
-          { label: "Rider profile", value: phone ? "Ready" : "Set up", note: phone ? "Contact details saved" : "Add your phone number", icon: "✳" },
-        ].map((stat) => (
-          <StaggerItem key={stat.label}>
-            <HoverLift>
-              <article className="group flex min-h-[140px] items-start justify-between rounded-[22px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_10px_35px_rgba(15,23,18,0.025)] transition-colors sm:p-6">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.19em] text-[var(--muted)]">{stat.label}</p>
-                  <p className="mt-3 text-3xl font-semibold tracking-[-0.06em] text-[var(--ink)]">{stat.value}</p>
-                  <p className="mt-1 text-xs text-[var(--muted)]">{stat.note}</p>
-                </div>
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-lg text-emerald-700 transition-transform group-hover:rotate-12 dark:text-emerald-300">{stat.icon}</span>
-              </article>
-            </HoverLift>
-          </StaggerItem>
-        ))}
-      </Stagger>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
-        <Reveal delay={0.12}>
-          <section className="h-full rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_10px_35px_rgba(15,23,18,0.025)] sm:p-7">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-300">Your journey</p>
-                <h2 className="mt-2 text-xl font-semibold tracking-[-0.04em] text-[var(--ink)]">Recent rides</h2>
-              </div>
-              <span className="rounded-full bg-[var(--surface-2)] px-3 py-1.5 text-[9px] font-bold uppercase tracking-wide text-[var(--muted)]">0 trips</span>
-            </div>
-            <div className="relative mt-6 flex min-h-[175px] flex-col items-center justify-center overflow-hidden rounded-[18px] border border-dashed border-[var(--line)] bg-[var(--canvas)]/70 px-5 text-center">
-              <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-emerald-500/15" />
-              <div className="absolute inset-y-0 left-1/2 border-l border-dashed border-emerald-500/15" />
-              <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--surface)] text-xl shadow-sm animate-float">✦</div>
-              <p className="relative mt-3 text-sm font-semibold text-[var(--ink)]">Your first trip will feel good here.</p>
-              <p className="relative mt-1 max-w-sm text-xs leading-5 text-[var(--muted)]">Once you take a ride, route details and receipts will be ready in your history.</p>
-            </div>
-          </section>
-        </Reveal>
+        <DashboardRideSummary hasPhone={Boolean(phone)} />
 
         <Reveal delay={0.2}>
           <section className="h-full rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_10px_35px_rgba(15,23,18,0.025)] sm:p-7">

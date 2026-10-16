@@ -59,6 +59,14 @@ export default function Navbar() {
                 <span className="relative z-10">Dashboard</span>
               </Link>
               <Link
+                href="/history"
+                aria-current={pathname === "/history" ? "page" : undefined}
+                className="nav-link relative rounded-full px-4 py-2 text-xs font-semibold"
+              >
+                {pathname === "/history" && <motion.span layoutId="nav-active-indicator" transition={{ type: "spring", stiffness: 360, damping: 30 }} className="absolute inset-0 z-0 rounded-full bg-emerald-500/10" />}
+                <span className="relative z-10">Trips</span>
+              </Link>
+              <Link
                 href="/profile"
                 aria-current={pathname === "/profile" ? "page" : undefined}
                 className="nav-link relative rounded-full px-4 py-2 text-xs font-semibold"

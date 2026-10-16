@@ -32,7 +32,13 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
 - [x] **Day 7 — Buffer day & testing**
   - [x] Add unit coverage for ride distance/fare formatting, driver offer ranking, ride lifecycle transitions, and in-app notifications
   - [x] Run lint, unit tests, and production builds in GitHub Actions for pushes and pull requests
-- [ ] Day 8–14 — Payments, history, reviews, polish, deployment
+- [x] **Day 8 — Ride history & dashboard summaries (browser-local prototype)**
+  - [x] Add a protected ride history page with status filters, search, route details, and fare estimates
+  - [x] Show live ride counts and recent requests on the signed-in dashboard
+  - [x] Clearly label history as device-local demo data, not account-synced receipts or paid fares
+- [ ] Day 9–14 — Backend, payments, reviews, polish, deployment
+  - [ ] Select and implement the database/backend before migrating ride records or adding payments
+  - [ ] Add payment processing only through a server-backed provider checkout; never store card details in the browser
 
 ## Getting started
 
@@ -50,7 +56,7 @@ npm run dev                        # http://localhost:3000
 4. Under **Configure → Paths** (or via the env vars), sign-in/up URLs are `/sign-in` and `/sign-up`; after auth users land on `/dashboard`.
 5. To use profile editing, allow name updates in the Clerk profile settings. To verify phone numbers, enable phone-number sign-in/verification and SMS delivery in the Clerk Dashboard.
 
-## Project structure (through Day 7 prototype)
+## Project structure (through Day 8 prototype)
 
 ```
 src/
@@ -63,7 +69,8 @@ src/
 │  ├─ dashboard/page.tsx         # Rider dashboard
 │  ├─ profile/page.tsx           # Protected profile settings
 │  ├─ book/page.tsx              # Protected ride planner
-│  └─ driver/page.tsx            # Protected demo driver dashboard
+│  ├─ driver/page.tsx            # Protected demo driver dashboard
+│  └─ history/page.tsx           # Protected browser-local ride history
 ├─ components/
 │  ├─ Navbar.tsx                 # Auth controls and signed-in navigation
 │  ├─ ProfileEditor.tsx          # Name, phone verification, and photo editor
@@ -71,7 +78,9 @@ src/
 │  ├─ RideMap.tsx                # Google Maps view or interactive local map
 │  ├─ GoogleMapsView.tsx         # Optional live Google Maps integration
 │  ├─ DriverExperience.tsx       # Demo ride matching and lifecycle controls
-│  └─ NotificationBell.tsx       # Cross-tab in-app ride notification center
+│  ├─ NotificationBell.tsx       # Cross-tab in-app ride notification center
+│  ├─ DashboardRideSummary.tsx   # Live dashboard ride counts and recent requests
+│  └─ RideHistoryExperience.tsx  # Searchable local ride history and estimates
 ├─ lib/
 │  ├─ ride.ts                    # Locations, fare estimates, and offer ranking
 │  └─ ride-storage.ts            # Same-origin rides, notifications, and sync
