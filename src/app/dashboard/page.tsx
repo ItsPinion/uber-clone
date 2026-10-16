@@ -57,10 +57,10 @@ async function DashboardContent() {
             <div className="max-w-2xl">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-200">Your city, at your pace</p>
               <h2 className="mt-3 text-3xl font-semibold leading-[0.98] tracking-[-0.06em] sm:text-5xl">The best part of the day<br className="hidden sm:block" /> is still ahead.</h2>
-              <p className="mt-4 max-w-md text-sm leading-6 text-white/65">We&apos;re getting your ride experience ready. Soon, your next destination will be just a few taps away.</p>
-              <span className="mt-6 inline-flex cursor-not-allowed items-center gap-3 rounded-full bg-emerald-300 px-5 py-3 text-xs font-bold text-zinc-950 opacity-90">
-                Ride booking is coming soon <span aria-hidden="true">↗</span>
-              </span>
+              <p className="mt-4 max-w-md text-sm leading-6 text-white/65">Set a pick-up, choose your ride, and preview a fare for your next trip across Visakhapatnam.</p>
+              <Link href="/book" className="group mt-6 inline-flex items-center gap-3 rounded-full bg-emerald-300 px-5 py-3 text-xs font-bold text-zinc-950 transition hover:bg-emerald-200">
+                Plan a ride <span aria-hidden="true" className="transition-transform group-hover:translate-x-1">↗</span>
+              </Link>
             </div>
             <div className="absolute bottom-8 right-9 hidden h-36 w-36 items-center justify-center rounded-full border border-white/15 lg:flex">
               <div className="absolute inset-3 rounded-full border border-dashed border-emerald-200/40 animate-spin-slow" />

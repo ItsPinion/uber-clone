@@ -65,6 +65,14 @@ export default function Navbar() {
                 {pathname === "/profile" && <motion.span layoutId="nav-active-indicator" transition={{ type: "spring", stiffness: 360, damping: 30 }} className="absolute inset-0 z-0 rounded-full bg-emerald-500/10" />}
                 <span className="relative z-10">Profile</span>
               </Link>
+              <Link
+                href="/book"
+                aria-current={pathname === "/book" ? "page" : undefined}
+                className="nav-link relative rounded-full px-4 py-2 text-xs font-semibold"
+              >
+                {pathname === "/book" && <motion.span layoutId="nav-active-indicator" transition={{ type: "spring", stiffness: 360, damping: 30 }} className="absolute inset-0 z-0 rounded-full bg-emerald-500/10" />}
+                <span className="relative z-10">Book</span>
+              </Link>
             </div>
           </Show>
 
@@ -94,7 +102,7 @@ export default function Navbar() {
           <Show when="signed-in">
             <div className="flex items-center gap-2 sm:gap-3">
               <Link href="/dashboard" aria-current={pathname === "/dashboard" ? "page" : undefined} className="mobile-nav-link sm:hidden">Home</Link>
-              <Link href="/profile" aria-current={pathname === "/profile" ? "page" : undefined} className="mobile-nav-link sm:hidden">Profile</Link>
+              <Link href="/book" aria-current={pathname === "/book" ? "page" : undefined} className="mobile-nav-link sm:hidden">Ride</Link>
               <UserButton />
             </div>
           </Show>
