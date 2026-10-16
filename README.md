@@ -40,9 +40,13 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
   - [x] Let riders rate completed demo trips from one to five stars with an optional short note
   - [x] Restrict reviews to completed rides and allow one review per trip
   - [x] Label reviews as device-local and not sent to drivers
-- [ ] Day 10–14 — Backend, payments, polish, deployment
-  - [ ] Select and implement the database/backend before migrating ride records or adding payments
-  - [ ] Add payment processing only through a server-backed provider checkout; never store card details in the browser
+- [x] **Day 10 — SQLite backend foundation (local prototype)**
+  - [x] Add a file-backed SQLite repository at `data/cabbook.sqlite` (no hosted account or card required)
+  - [x] Add Clerk-authenticated, user-scoped ride list/create/update API endpoints; derive ownership from the signed-in session and recompute fare/distance server-side
+  - [x] Add in-memory SQLite tests for owner isolation and ride updates
+  - [ ] Connect the browser UI to the new API and migrate existing browser-local demo rides
+- [ ] Days 11–14 — Client migration, payments, polish, deployment
+  - [ ] Keep payment processing deferred until a server-backed provider and deployment database strategy are selected; never store card details in the browser
 
 ## Getting started
 
@@ -52,6 +56,8 @@ cp .env.local.example .env.local   # then fill in your Clerk keys
 npm run dev                        # http://localhost:3000
 ```
 
+The local SQLite API uses `better-sqlite3` and writes to `data/cabbook.sqlite` (or `CABBOOK_DATABASE_PATH`). The database file is git-ignored. This is intended for local development or a server with a persistent writable disk; ephemeral/serverless deployments need a hosted database or persistent volume. The rider UI still uses browser-local demo storage until the next client-migration step.
+
 ### Clerk setup (one-time)
 
 1. Create an application at <https://dashboard.clerk.com>.
@@ -60,7 +66,7 @@ npm run dev                        # http://localhost:3000
 4. Under **Configure → Paths** (or via the env vars), sign-in/up URLs are `/sign-in` and `/sign-up`; after auth users land on `/dashboard`.
 5. To use profile editing, allow name updates in the Clerk profile settings. To verify phone numbers, enable phone-number sign-in/verification and SMS delivery in the Clerk Dashboard.
 
-## Project structure (through Day 8 prototype)
+## Project structure (through Day 10 prototype)
 
 ```
 src/
@@ -74,7 +80,10 @@ src/
 │  ├─ profile/page.tsx           # Protected profile settings
 │  ├─ book/page.tsx              # Protected ride planner
 │  ├─ driver/page.tsx            # Protected demo driver dashboard
-│  └─ history/page.tsx           # Protected browser-local ride history
+│  ├─ history/page.tsx           # Protected browser-local ride history and reviews
+│  └─ api/rides/
+│     ├─ route.ts                # Authenticated ride list and creation
+│     └─ [rideId]/route.ts       # Owner-scoped ride transitions and reviews
 ├─ components/
 │  ├─ Navbar.tsx                 # Auth controls and signed-in navigation
 │  ├─ ProfileEditor.tsx          # Name, phone verification, and photo editor
@@ -87,11 +96,13 @@ src/
 │  └─ RideHistoryExperience.tsx  # Searchable local ride history and estimates
 ├─ lib/
 │  ├─ ride.ts                    # Locations, fare estimates, and offer ranking
-│  └─ ride-storage.ts            # Same-origin rides, notifications, and sync
+│  ├─ ride-storage.ts            # Same-origin rides, notifications, and sync
+│  └─ server/ride-database.ts    # Local SQLite persistence scoped by Clerk user
 └─ proxy.ts                      # Clerk middleware (Next.js 16 "proxy" file)
 tests/
 ├─ ride.test.ts                  # Fare, distance, formatting, and offer ranking
-└─ ride-storage.test.ts          # Ride lifecycle, notifications, and local reviews
+├─ ride-storage.test.ts          # Ride lifecycle, notifications, and local reviews
+└─ ride-database.test.ts         # SQLite storage and user-isolation checks
 ```
 
 ## Scripts

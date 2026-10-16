@@ -10,6 +10,12 @@
 !.yarn/releases
 !.yarn/versions
 
+# local SQLite database files
+/data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
 # testing
 /coverage
 
