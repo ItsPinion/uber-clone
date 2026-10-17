@@ -13,4 +13,4 @@ A screenshot-by-screenshot review found and fixed three visible issues: location
 
 **Sandbox limitations:** The protected pages use a synthetic `Aarav Demo` identity in a temporary screenshot-only Clerk mock; this does not verify a real authenticated Clerk session. The sign-in/sign-up captures show a neutral placeholder in place of Clerk-hosted widgets, which could not load in the sandbox. OpenStreetMap tile requests were blocked, so `/book` uses the app’s built-in offline route illustration in these captures; real map tiles are not verified. No real user credentials or personal data are included.
 
-The application’s default theme remains set to follow the operating system (`system`) after the explicit light and dark capture passes.
+The booking map now requests road-following geometry from the public OSRM demo router and clearly labels its direct-line fallback if routing is unavailable. The application’s default theme remains set to follow the operating system (`system`) after the explicit light and dark capture passes.
