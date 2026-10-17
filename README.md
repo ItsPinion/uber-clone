@@ -58,7 +58,11 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
   - [x] Keep the Clerk secret out of image build arguments; inject it only into the running container
   - [x] Add a database-backed readiness endpoint and container health check
   - [x] Document self-hosted setup, backups, and local SQLite/OSM operational limits
-- [ ] Day 14 — Final polish
+- [x] **Day 14 — Final polish and release verification**
+  - [x] Exclude the database readiness endpoint from Clerk middleware and return explicit `no-store` responses
+  - [x] Test both healthy and unavailable SQLite readiness states without leaking database errors
+  - [x] Capture and review production UI screenshots in light, dark, and mobile layouts; record the live readiness endpoint capture
+  - [x] Re-run ride, driver, booking, review, history, routing, and deployment checks
 
 ## Getting started
 
@@ -96,7 +100,7 @@ Terminate public HTTPS at a maintained reverse proxy or load balancer; do not ex
 4. Under **Configure → Paths** (or via the env vars), sign-in/up URLs are `/sign-in` and `/sign-up`; after auth users land on `/dashboard`.
 5. To use profile editing, allow name updates in the Clerk profile settings. To verify phone numbers, enable phone-number sign-in/verification and SMS delivery in the Clerk Dashboard.
 
-## Project structure (through Day 13)
+## Project structure (through Day 14)
 
 ```
 src/
@@ -132,10 +136,13 @@ src/
 │  └─ server/ride-database.ts    # Local SQLite persistence scoped by Clerk user
 └─ proxy.ts                      # Clerk middleware (Next.js 16 "proxy" file)
 tests/
+├─ health-ready.test.ts          # Uncached readiness success/failure without database detail leaks
 ├─ ride.test.ts                  # Fare, distance, formatting, and offer ranking
 ├─ ride-storage.test.ts          # Ride lifecycle, notifications, and local reviews
 ├─ ride-database.test.ts         # SQLite storage and user-isolation checks
 └─ ride-api.test.ts              # Client/API lifecycle, review, and owner-isolation integration
+artifacts/day13/                 # Readiness endpoint and inspected light/dark/mobile UI captures
+artifacts/day14/                 # Final readiness and UI verification captures
 drizzle.config.ts                # Drizzle Kit SQLite configuration
 drizzle/                         # Generated SQL migrations and migration journal
 Dockerfile                       # Multi-stage production standalone image
