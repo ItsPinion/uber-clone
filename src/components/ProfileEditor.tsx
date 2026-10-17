@@ -229,7 +229,7 @@ function ProfileForm({ user }: { user: ClerkUser }) {
       >
         <div className="flex flex-col justify-between gap-5 border-b border-zinc-100 pb-6 sm:flex-row sm:items-center">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Personal details</p>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Personal details</p>
             <h2 className="mt-2 text-xl font-bold tracking-tight text-zinc-950">Your rider profile</h2>
             <p className="mt-1 text-sm text-zinc-500">Make sure your details are current before your first ride.</p>
           </div>
@@ -301,7 +301,7 @@ function ProfileForm({ user }: { user: ClerkUser }) {
                 <p className="mt-1 text-xs text-zinc-500">Add a number with country code. We&apos;ll verify it by SMS.</p>
               </div>
               {phoneIsVerified && (
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                   Verified
                 </span>
               )}

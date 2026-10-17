@@ -5,6 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import RideMap from "@/components/RideMap";
+import LocationPinIcon from "@/components/LocationPinIcon";
 import { calculateDistanceKm, estimateFare, formatRupees, getRidePricing, VIZAG_LOCATIONS, type RideCategory } from "@/lib/ride";
 import { cacheServerRideRequest, cacheServerRideUpdate, requestRideFromServer, updateRideOnServer, useRideRequests } from "@/lib/ride-storage";
 
@@ -192,7 +193,7 @@ export default function BookingExperience() {
               <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">Plan your ride</p>
               <h2 className="mt-2 text-xl font-semibold tracking-[-0.04em] text-[var(--ink)]">Pick-up & drop-off</h2>
             </div>
-            <motion.span animate={reduceMotion ? undefined : { rotate: [0, 7, -5, 0] }} transition={{ duration: 4.5, repeat: Infinity }} className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-lg text-emerald-700 dark:text-emerald-300">⌖</motion.span>
+            <motion.span animate={reduceMotion ? undefined : { rotate: [0, 7, -5, 0] }} transition={{ duration: 4.5, repeat: Infinity }} className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"><LocationPinIcon className="h-5 w-5" /></motion.span>
           </div>
 
           <div className="mt-6 space-y-3">

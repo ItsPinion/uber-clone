@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import LocationPinIcon from "@/components/LocationPinIcon";
 import { useMemo } from "react";
 import { HoverLift, Reveal, Stagger, StaggerItem } from "@/components/MotionPrimitives";
 import { useRideRequests } from "@/lib/ride-storage";
@@ -36,7 +37,7 @@ export default function DashboardRideSummary({ hasPhone }: { hasPhone: boolean }
 
   const stats = [
     { label: "Trips completed", value: String(completedCount).padStart(2, "0"), note: completedCount ? "Nice travels" : "Your first ride is waiting", icon: "↗" },
-    { label: "Active requests", value: String(activeCount).padStart(2, "0"), note: activeCount ? "Check your ride status" : "No active ride", icon: "⌖" },
+    { label: "Active requests", value: String(activeCount).padStart(2, "0"), note: activeCount ? "Check your ride status" : "No active ride", icon: "location" },
     { label: "Rider profile", value: hasPhone ? "Ready" : "Set up", note: hasPhone ? "Contact details saved" : "Add your phone number", icon: "✳" },
   ];
 
@@ -52,7 +53,7 @@ export default function DashboardRideSummary({ hasPhone }: { hasPhone: boolean }
                   <p className="mt-3 text-3xl font-semibold tracking-[-0.06em] text-[var(--ink)]">{stat.value}</p>
                   <p className="mt-1 text-xs text-[var(--muted)]">{stat.note}</p>
                 </div>
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-lg text-emerald-700 transition-transform group-hover:rotate-12 dark:text-emerald-300">{stat.icon}</span>
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-lg text-emerald-700 transition-transform group-hover:rotate-12 dark:text-emerald-300">{stat.icon === "location" ? <LocationPinIcon className="h-5 w-5" /> : stat.icon}</span>
               </article>
             </HoverLift>
           </StaggerItem>

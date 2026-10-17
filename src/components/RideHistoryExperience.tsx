@@ -160,7 +160,7 @@ export default function RideHistoryExperience() {
           </label>
         </div>
 
-        <div className="mt-5 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Filter rides by status">
+        <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label="Filter rides by status">
           {filters.map((value) => (
             <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className={`shrink-0 rounded-full px-4 py-2 text-[10px] font-bold capitalize transition ${filter === value ? "bg-emerald-500 text-zinc-950" : "border border-[var(--line)] bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--ink)]"}`}>
               {value === "other" ? "Cancelled / passed" : value}

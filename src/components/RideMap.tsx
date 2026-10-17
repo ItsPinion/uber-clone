@@ -97,7 +97,7 @@ export default function RideMap({ pickup, dropoff }: { pickup: RideLocation; dro
     return (
       <div className="relative h-full w-full">
         <MapIllustration pickup={pickup} dropoff={dropoff} />
-        <button type="button" onClick={() => setUseOfflineMap(false)} className="absolute right-4 top-4 z-10 rounded-full border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-[9px] font-bold text-[var(--ink)] shadow-sm transition hover:border-emerald-500/50">
+        <button type="button" onClick={() => setUseOfflineMap(false)} className="absolute right-4 top-14 z-10 rounded-full border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-[9px] font-bold text-[var(--ink)] shadow-sm transition hover:border-emerald-500/50">
           Switch to OpenStreetMap
         </button>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import LocationPinIcon from "@/components/LocationPinIcon";
 import { useUser } from "@clerk/nextjs";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -136,7 +137,7 @@ export default function DriverExperience() {
               <motion.div key="empty-offers" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} className="relative flex min-h-64 flex-col items-center justify-center overflow-hidden rounded-[24px] border border-dashed border-[var(--line)] bg-[var(--surface)] px-5 py-9 text-center">
                 <div className="absolute h-40 w-40 rounded-full border border-emerald-500/10 animate-pulse-soft" />
                 <div className="absolute h-28 w-28 rounded-full border border-dashed border-emerald-500/20 animate-spin-slow" />
-                <motion.span animate={reduceMotion ? undefined : { y: [0, -5, 0], rotate: [0, 5, 0] }} transition={{ duration: 3.4, repeat: Infinity }} className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-xl text-emerald-700 dark:text-emerald-300">⌖</motion.span>
+                <motion.span animate={reduceMotion ? undefined : { y: [0, -5, 0], rotate: [0, 5, 0] }} transition={{ duration: 3.4, repeat: Infinity }} className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"><LocationPinIcon className="h-6 w-6" /></motion.span>
                 <h3 className="relative mt-4 text-sm font-bold text-[var(--ink)]">{isOnline ? "You’re in the right place." : "You’re offline for now."}</h3>
                 <p className="relative mt-1 max-w-sm text-xs leading-5 text-[var(--muted)]">{isOnline ? "New requests from the rider booking demo will appear here. Keep this page open while testing." : "Switch online when you’re ready to see nearby trip offers."}</p>
                 <Link href="/book" className="relative mt-4 rounded-full border border-[var(--line)] px-4 py-2 text-[10px] font-bold text-[var(--muted)] transition hover:border-emerald-500/40 hover:text-emerald-700 dark:hover:text-emerald-300">Create a rider demo request ↗</Link>
@@ -166,7 +167,7 @@ export default function DriverExperience() {
                 <p className="text-[9px] font-bold uppercase tracking-[0.19em] text-emerald-700 dark:text-emerald-300">On the map</p>
                 <h2 className="mt-2 text-lg font-semibold tracking-tight text-[var(--ink)]">Your demo driver spot</h2>
                 <div className="mt-4 flex items-center gap-3 rounded-2xl bg-[var(--surface-2)] p-4">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-lg text-emerald-700 dark:text-emerald-300">⌖</span>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"><LocationPinIcon className="h-5 w-5" /></span>
                   <div><p className="text-xs font-bold text-[var(--ink)]">{DEMO_DRIVER_LOCATION.name}</p><p className="mt-1 text-[10px] text-[var(--muted)]">{DEMO_DRIVER_LOCATION.area} · Visakhapatnam</p></div>
                 </div>
                 <div className="mt-4 flex items-center justify-between text-[10px]"><span className="text-[var(--muted)]">Vehicle</span><span className="font-semibold text-[var(--ink)]">{DEMO_DRIVER.vehicle}</span></div>
