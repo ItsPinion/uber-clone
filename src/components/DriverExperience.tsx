@@ -5,7 +5,7 @@ import LocationPinIcon from "@/components/LocationPinIcon";
 import { useUser } from "@clerk/nextjs";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { cacheServerRideUpdate, updateRideOnServer, useRideRequests } from "@/lib/ride-storage";
+import { updateDriverRideOnServer, useDriverRides } from "@/lib/driver-storage";
 import { DEMO_DRIVER_LOCATION, formatRupees, getRidePricing, rankRideOffers } from "@/lib/ride";
 import type { SavedRideRequest } from "@/lib/ride";
 
@@ -38,9 +38,8 @@ function RideStatusBadge({ status }: { status: SavedRideRequest["status"] }) {
 export default function DriverExperience() {
   const { isLoaded, user } = useUser();
   const userId = isLoaded ? user?.id ?? null : null;
-  const requests = useRideRequests();
+  const { rides: requests, setRides, error, setError, isLoading, refresh } = useDriverRides(Boolean(userId));
   const [isOnline, setIsOnline] = useState(true);
-  const [error, setError] = useState("");
   const [updatingRideId, setUpdatingRideId] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
   const offers = useMemo(() => rankRideOffers(requests, DEMO_DRIVER_LOCATION), [requests]);
@@ -57,8 +56,9 @@ export default function DriverExperience() {
     setError("");
     setUpdatingRideId(rideId);
     try {
-      const updated = await updateRideOnServer(rideId, action);
-      cacheServerRideUpdate(updated, action, userId);
+      const updated = await updateDriverRideOnServer(rideId, action);
+      setRides((current) => [updated, ...current.filter((ride) => ride.id !== updated.id)]);
+      void refresh();
     } catch (rideError) {
       setError(rideError instanceof Error ? rideError.message : "Could not update the ride status.");
     } finally {
@@ -89,7 +89,7 @@ export default function DriverExperience() {
           <div className="max-w-xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-white/70"><span className="text-emerald-300">✳</span> Demo driver · {DEMO_DRIVER_LOCATION.area}</div>
             <h2 className="mt-4 text-2xl font-semibold tracking-[-0.05em] sm:text-3xl">Good rides begin with a good match.</h2>
-            <p className="mt-2 max-w-lg text-xs leading-5 text-white/55 sm:text-sm">Offers are sorted by pickup distance from your demo driver location. Accept one to assign it to this driver.</p>
+            <p className="mt-2 max-w-lg text-xs leading-5 text-white/55 sm:text-sm">Shared rider requests are sorted by pickup distance from your demo driver location. Accept one to reserve it for this driver account.</p>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:min-w-64">
             <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur"><p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/45">Open offers</p><motion.p key={offeredCount} initial={{ y: 8, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mt-2 text-3xl font-semibold tracking-tight text-emerald-300">{offeredCount.toString().padStart(2, "0")}</motion.p></div>
@@ -133,14 +133,16 @@ export default function DriverExperience() {
                   </motion.article>
                 ))}
               </motion.div>
+            ) : isLoading ? (
+              <div role="status" className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] px-5 py-12 text-center text-xs text-[var(--muted)]">Loading shared ride offers…</div>
             ) : (
               <motion.div key="empty-offers" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} className="relative flex min-h-64 flex-col items-center justify-center overflow-hidden rounded-[24px] border border-dashed border-[var(--line)] bg-[var(--surface)] px-5 py-9 text-center">
                 <div className="absolute h-40 w-40 rounded-full border border-emerald-500/10 animate-pulse-soft" />
                 <div className="absolute h-28 w-28 rounded-full border border-dashed border-emerald-500/20 animate-spin-slow" />
                 <motion.span animate={reduceMotion ? undefined : { y: [0, -5, 0], rotate: [0, 5, 0] }} transition={{ duration: 3.4, repeat: Infinity }} className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"><LocationPinIcon className="h-6 w-6" /></motion.span>
                 <h3 className="relative mt-4 text-sm font-bold text-[var(--ink)]">{isOnline ? "You’re in the right place." : "You’re offline for now."}</h3>
-                <p className="relative mt-1 max-w-sm text-xs leading-5 text-[var(--muted)]">{isOnline ? "New requests from the rider booking demo will appear here. Keep this page open while testing." : "Switch online when you’re ready to see nearby trip offers."}</p>
-                <Link href="/book" className="relative mt-4 rounded-full border border-[var(--line)] px-4 py-2 text-[10px] font-bold text-[var(--muted)] transition hover:border-emerald-500/40 hover:text-emerald-700 dark:hover:text-emerald-300">Create a rider demo request ↗</Link>
+                <p className="relative mt-1 max-w-sm text-xs leading-5 text-[var(--muted)]">{isOnline ? "Requests from other rider accounts appear here automatically. Offers refresh every 15 seconds while this page is open." : "Switch online when you’re ready to see nearby trip offers."}</p>
+                <Link href="/dashboard" className="relative mt-4 rounded-full border border-[var(--line)] px-4 py-2 text-[10px] font-bold text-[var(--muted)] transition hover:border-emerald-500/40 hover:text-emerald-700 dark:hover:text-emerald-300">Return to rider dashboard ↗</Link>
               </motion.div>
             )}
           </AnimatePresence>
@@ -185,7 +187,7 @@ export default function DriverExperience() {
         </aside>
       </div>
 
-      <p className="mt-5 text-center text-[9px] leading-5 text-[var(--muted)]">Ride updates are persisted to your account and cached for same-origin tab sync. This is still a demo driver flow, not a real matching service.</p>
+      <p className="mt-5 text-center text-[9px] leading-5 text-[var(--muted)]">Ride offers and driver actions are stored in SQLite and visible to the rider account. The queue refreshes periodically; this remains a demo flow, not a dispatch service.</p>
     </main>
   );
 }

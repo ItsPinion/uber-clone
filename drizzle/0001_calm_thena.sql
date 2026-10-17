@@ -1,0 +1,1 @@
+ALTER TABLE `rides` ADD `driver_user_id` text;

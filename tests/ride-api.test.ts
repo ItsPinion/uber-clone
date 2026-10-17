@@ -7,6 +7,7 @@ import {
   requestRideFromServer,
   updateRideOnServer,
 } from "../src/lib/ride-storage";
+import { updateDriverRideOnServer } from "../src/lib/driver-storage";
 import { calculateDistanceKm, estimateFare, VIZAG_LOCATIONS, type SavedRideRequest } from "../src/lib/ride";
 
 process.env.CABBOOK_DATABASE_PATH = ":memory:";
@@ -38,6 +39,8 @@ test("signed-in client ride flows persist through the authenticated API and rema
   const clerkModuleId = require.resolve("@clerk/nextjs/server");
   const originalClerkModule = require.cache[clerkModuleId];
   const originalFetch = globalThis.fetch;
+  const originalDriverIds = process.env.CABBOOK_DRIVER_USER_IDS;
+  process.env.CABBOOK_DRIVER_USER_IDS = "driver-one,driver-two";
   require.cache[clerkModuleId] = {
     id: clerkModuleId,
     filename: clerkModuleId,
@@ -48,10 +51,18 @@ test("signed-in client ride flows persist through the authenticated API and rema
   try {
     const ridesRoute = await import("../src/app/api/rides/route");
     const rideRoute = await import("../src/app/api/rides/[rideId]/route");
+    const driverRidesRoute = await import("../src/app/api/driver/rides/route");
+    const driverRideRoute = await import("../src/app/api/driver/rides/[rideId]/route");
     globalThis.fetch = async (input, init) => {
       const requestUrl = new URL(String(input), "http://localhost");
       const request = new Request(requestUrl, init);
       if (requestUrl.pathname === "/api/rides" && request.method === "POST") return ridesRoute.POST(request);
+      if (requestUrl.pathname === "/api/driver/rides" && request.method === "GET") return driverRidesRoute.GET();
+      const driverRideMatch = requestUrl.pathname.match(/^\/api\/driver\/rides\/([^/]+)$/);
+      if (driverRideMatch && request.method === "PATCH") {
+        const rideId = decodeURIComponent(driverRideMatch[1]);
+        return driverRideRoute.PATCH(request, { params: Promise.resolve({ rideId }) });
+      }
       const rideMatch = requestUrl.pathname.match(/^\/api\/rides\/([^/]+)$/);
       if (rideMatch && request.method === "PATCH") {
         const rideId = decodeURIComponent(rideMatch[1]);
@@ -61,8 +72,11 @@ test("signed-in client ride flows persist through the authenticated API and rema
     };
 
     const listRides = () => ridesRoute.GET();
+    const listDriverRides = () => driverRidesRoute.GET();
     const create = (body: unknown) => ridesRoute.POST(new Request("http://localhost/api/rides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
     const update = (rideId: string, body: unknown) => rideRoute.PATCH(new Request(`http://localhost/api/rides/${rideId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }), { params: Promise.resolve({ rideId }) });
+    const driverUpdate = (rideId: string, body: unknown) => driverRideRoute.PATCH(new Request(`http://localhost/api/driver/rides/${rideId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }), { params: Promise.resolve({ rideId }) });
+    const malformedDriverUpdate = (rideId: string) => driverRideRoute.PATCH(new Request(`http://localhost/api/driver/rides/${rideId}`, { method: "PATCH", body: "not-json" }), { params: Promise.resolve({ rideId }) });
     const malformedCreate = () => ridesRoute.POST(new Request("http://localhost/api/rides", { method: "POST", body: "not-json" }));
     const malformedUpdate = (rideId: string) => rideRoute.PATCH(new Request(`http://localhost/api/rides/${rideId}`, { method: "PATCH", body: "not-json" }), { params: Promise.resolve({ rideId }) });
     const json = async <T>(response: Response) => await response.json() as T;
@@ -91,25 +105,48 @@ test("signed-in client ride flows persist through the authenticated API and rema
     cacheServerRideRequest(created, "rider-one");
     const rideId = created.id;
 
+    activeUserId = null;
+    assert.equal((await listDriverRides()).status, 401);
+    assert.equal((await driverUpdate(rideId, { action: "accept" })).status, 401);
     activeUserId = "rider-two";
     assert.deepEqual(await json<{ rides: unknown[] }>(await listRides()), { rides: [] });
     await assert.rejects(updateRideOnServer(rideId, "cancel"), /Ride not found/);
+    assert.equal((await listDriverRides()).status, 403);
+    assert.equal((await driverUpdate(rideId, { action: "accept" })).status, 403);
 
     activeUserId = "rider-one";
     assert.equal((await malformedUpdate(rideId)).status, 400);
     assert.equal((await update(rideId, { action: "teleport" })).status, 400);
-    const accepted = await updateRideOnServer(rideId, "accept");
+    assert.equal((await update(rideId, { action: "accept" })).status, 400);
+
+    activeUserId = "driver-one";
+    assert.equal((await malformedDriverUpdate(rideId)).status, 400);
+    assert.equal((await driverUpdate(rideId, { action: "teleport" })).status, 400);
+    assert.equal((await driverUpdate("missing-ride", { action: "accept" })).status, 404);
+    const driverOwnRide = await requestRideFromServer(pickup.id, dropoff.id, "mini");
+    cacheServerRideRequest(driverOwnRide, "driver-one");
+    const driverOffers = await json<{ rides: SavedRideRequest[] }>(await listDriverRides());
+    assert.ok(driverOffers.rides.some((ride) => ride.id === rideId));
+    assert.ok(!driverOffers.rides.some((ride) => ride.id === driverOwnRide.id));
+    const accepted = await updateDriverRideOnServer(rideId, "accept");
     assert.equal(accepted.status, "accepted");
     assert.equal(accepted.driver?.name, "CabBook Demo Driver");
-    cacheServerRideUpdate(accepted, "accept", "rider-one");
-    await assert.rejects(updateRideOnServer(rideId, "accept"), /not valid for the current ride status/);
+    await assert.rejects(updateDriverRideOnServer(rideId, "accept"), /not valid for the current ride status/);
 
-    const started = await updateRideOnServer(rideId, "start");
+    activeUserId = "driver-two";
+    const secondDriverOffers = await json<{ rides: SavedRideRequest[] }>(await listDriverRides());
+    assert.ok(secondDriverOffers.rides.some((ride) => ride.id === driverOwnRide.id));
+    assert.ok(!secondDriverOffers.rides.some((ride) => ride.id === rideId));
+    await assert.rejects(updateDriverRideOnServer(rideId, "start"), /Ride offer not found/);
+
+    activeUserId = "driver-one";
+    const started = await updateDriverRideOnServer(rideId, "start");
     assert.equal(started.status, "in_progress");
-    cacheServerRideUpdate(started, "start", "rider-one");
-    const completed = await updateRideOnServer(rideId, "complete");
+    const completed = await updateDriverRideOnServer(rideId, "complete");
     assert.equal(completed.status, "completed");
+    await assert.rejects(updateDriverRideOnServer(rideId, "complete"), /not valid for the current ride status/);
     cacheServerRideUpdate(completed, "complete", "rider-one");
+    activeUserId = "rider-one";
     await assert.rejects(updateRideOnServer(rideId, "review", { rating: 0, comment: "invalid" }), /1 to 5 stars/);
     await assert.rejects(updateRideOnServer(rideId, "review", { rating: 5, comment: "x".repeat(501) }), /500 characters or fewer/);
     const reviewed = await updateRideOnServer(rideId, "review", { rating: 5, comment: "  Smooth ride!  " });
@@ -129,8 +166,10 @@ test("signed-in client ride flows persist through the authenticated API and rema
 
     const declinedRide = await requestRideFromServer(pickup.id, dropoff.id, "mini");
     cacheServerRideRequest(declinedRide, "rider-one");
-    const declined = await updateRideOnServer(declinedRide.id, "decline");
+    activeUserId = "driver-one";
+    const declined = await updateDriverRideOnServer(declinedRide.id, "decline");
     assert.equal(declined.status, "declined");
+    activeUserId = "rider-one";
     cacheServerRideUpdate(declined, "decline", "rider-one");
 
     const cancelledRide = await requestRideFromServer(pickup.id, dropoff.id, "xl");
@@ -143,5 +182,7 @@ test("signed-in client ride flows persist through the authenticated API and rema
     globalThis.fetch = originalFetch;
     if (originalClerkModule) require.cache[clerkModuleId] = originalClerkModule;
     else delete require.cache[clerkModuleId];
+    if (originalDriverIds === undefined) delete process.env.CABBOOK_DRIVER_USER_IDS;
+    else process.env.CABBOOK_DRIVER_USER_IDS = originalDriverIds;
   }
 });

@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import Database from "better-sqlite3";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, not, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import type { SavedRideRequest } from "@/lib/ride";
@@ -61,11 +61,61 @@ export function createRideForUser(userId: string, ride: SavedRideRequest) {
   return true;
 }
 
-export function updateRideForUser(userId: string, ride: SavedRideRequest) {
+export function updateRideForUser(userId: string, ride: SavedRideRequest, expectedStatus: SavedRideRequest["status"]) {
   const result = getDatabase()
     .update(rides)
     .set({ createdAt: ride.createdAt, status: ride.status, payload: JSON.stringify(ride) })
-    .where(and(eq(rides.userId, userId), eq(rides.id, ride.id)))
+    .where(and(eq(rides.userId, userId), eq(rides.id, ride.id), eq(rides.status, expectedStatus)))
+    .run();
+  return result.changes === 1;
+}
+
+export function listRidesForDriver(driverUserId: string) {
+  return getDatabase()
+    .select({ payload: rides.payload })
+    .from(rides)
+    .where(or(
+      and(eq(rides.status, "requested"), not(eq(rides.userId, driverUserId))),
+      eq(rides.driverUserId, driverUserId),
+    ))
+    .orderBy(desc(rides.createdAt))
+    .limit(100)
+    .all()
+    .map((row) => JSON.parse(row.payload) as SavedRideRequest);
+}
+
+export function findRideOfferForDriver(driverUserId: string, rideId: string) {
+  const row = getDatabase()
+    .select({ payload: rides.payload })
+    .from(rides)
+    .where(and(
+      eq(rides.id, rideId),
+      or(
+        and(eq(rides.status, "requested"), not(eq(rides.userId, driverUserId))),
+        eq(rides.driverUserId, driverUserId),
+      ),
+    ))
+    .get();
+  return row ? JSON.parse(row.payload) as SavedRideRequest : null;
+}
+
+export function transitionRideForDriver(
+  driverUserId: string,
+  ride: SavedRideRequest,
+  expectedStatus: SavedRideRequest["status"],
+) {
+  const assignedToDriver = expectedStatus === "requested"
+    ? isNull(rides.driverUserId)
+    : eq(rides.driverUserId, driverUserId);
+  const result = getDatabase()
+    .update(rides)
+    .set({ createdAt: ride.createdAt, status: ride.status, payload: JSON.stringify(ride), driverUserId })
+    .where(and(
+      eq(rides.id, ride.id),
+      eq(rides.status, expectedStatus),
+      expectedStatus === "requested" ? not(eq(rides.userId, driverUserId)) : assignedToDriver,
+      ...(expectedStatus === "requested" ? [assignedToDriver] : []),
+    ))
     .run();
   return result.changes === 1;
 }

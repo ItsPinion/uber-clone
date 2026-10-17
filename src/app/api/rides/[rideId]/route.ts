@@ -12,10 +12,6 @@ function nextRideForAction(ride: NonNullable<ReturnType<typeof findRideForUser>>
   const action = body.action;
   const transitions: Partial<Record<string, { from: RideStatus; to: RideStatus }>> = {
     cancel: { from: "requested", to: "cancelled" },
-    decline: { from: "requested", to: "declined" },
-    accept: { from: "requested", to: "accepted" },
-    start: { from: "accepted", to: "in_progress" },
-    complete: { from: "in_progress", to: "completed" },
   };
 
   if (action === "review") {
@@ -36,7 +32,7 @@ function nextRideForAction(ride: NonNullable<ReturnType<typeof findRideForUser>>
   }
 
   if (typeof action !== "string" || !transitions[action]) {
-    return { error: "Choose a supported ride action.", status: 400 };
+    return { error: "Choose a supported rider action.", status: 400 };
   }
   const transition = transitions[action];
   if (!transition || ride.status !== transition.from) {
@@ -76,7 +72,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const result = nextRideForAction(ride, body);
     if ("error" in result) return Response.json({ error: result.error }, { status: result.status });
-    if (!updateRideForUser(userId, result.ride)) {
+    if (!updateRideForUser(userId, result.ride, ride.status)) {
       return Response.json({ error: "Ride update was not saved." }, { status: 409 });
     }
     return Response.json({ ride: result.ride }, { headers: { "Cache-Control": "private, no-store" } });

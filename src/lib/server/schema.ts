@@ -6,6 +6,7 @@ export const rides = sqliteTable(
   {
     id: text("id").primaryKey(),
     userId: text("user_id").notNull(),
+    driverUserId: text("driver_user_id"),
     createdAt: text("created_at").notNull(),
     status: text("status").$type<RideStatus>().notNull(),
     payload: text("payload").notNull(),

@@ -9,7 +9,7 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
   - [x] Install and configure Tailwind CSS
   - [x] Set up Clerk (sign-up, login, social-auth-ready UI)
   - [x] Route protection via `src/proxy.ts` (public: `/`, `/sign-in`, `/sign-up`)
-- [ ] Day 2 — Database & backend setup
+- [x] Day 2 — Database & backend setup (completed with the Day 10 SQLite foundation)
 - [x] **Day 3 — User dashboard & profile**
   - [x] Build a responsive rider dashboard with account overview and empty ride-history states
   - [x] Add profile editing for name and profile photo using Clerk
@@ -23,8 +23,8 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
 - [ ] **Day 5 — Driver dashboard & ride matching**
   - [x] Add a protected driver view with online/offline state and a nearby-request queue
   - [x] Rank demo offers by estimated pickup distance; accept or pass on requests
-  - [x] Add accepted → in-progress → completed trip actions with same-browser-tab updates
-  - [ ] Replace browser-local demo matching with authenticated, server-side driver matching after Day 2 backend setup
+  - [x] Add accepted → in-progress → completed demo trip actions (server-backed across rider and driver accounts on Day 15)
+  - [x] Replace browser-local offers with allow-listed, authenticated SQLite matching (Day 15)
 - [ ] **Day 6 — Real-time updates & notifications (prototype)**
   - [x] Broadcast ride state changes between same-origin tabs with BroadcastChannel and a storage-event fallback
   - [x] Add an animated in-app notification center for requests, driver matches, cancellations, and trip status
@@ -63,6 +63,12 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
   - [x] Test both healthy and unavailable SQLite readiness states without leaking database errors
   - [x] Capture and review production UI screenshots in light, dark, and mobile layouts; record the live readiness endpoint capture
   - [x] Re-run ride, driver, booking, review, history, routing, and deployment checks
+- [x] **Day 15 — Server-side driver matching**
+  - [x] Add SQLite ownership for claimed driver rides and serialize concurrent claims
+  - [x] Restrict driver pages and APIs to Clerk IDs in the server-side `CABBOOK_DRIVER_USER_IDS` allow-list
+  - [x] Share requested offers across rider accounts while excluding a driver’s own requests
+  - [x] Move accept/pass/start/complete actions to dedicated driver endpoints and refresh offers every 15 seconds
+  - [x] Keep rider cancellation and review actions owner-scoped; document setup and demo limits
 
 ## Getting started
 
@@ -90,6 +96,8 @@ docker compose ps
 
 Compose passes `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` as a build argument because Next.js embeds the public key into the client bundle. `CLERK_SECRET_KEY` is supplied only to the running container, never as a Docker build argument. The container applies Drizzle migrations when it first opens the database, stores SQLite data in the persistent `cabbook-data` volume, and exposes `/api/health/ready` for database readiness. Set `HOST_PORT` in `.env` to change the host port. Use `docker compose logs -f web` to inspect service logs, `docker compose down` to stop it without deleting data, and `docker volume ls` to locate the database volume. `docker compose down -v` permanently deletes that volume and its ride data.
 
+To enable the demo driver dashboard, set `CABBOOK_DRIVER_USER_IDS` to a comma-separated allow-list of Clerk user IDs in `.env.local` (local development) or `.env` (Compose). An empty value disables driver access. Only listed accounts can view `/driver` or use `/api/driver/rides`; the allow-list stays server-side. The demo queue is shared across rider accounts, prevents drivers from accepting their own requests, atomically assigns each offer to one driver, and polls for new offers every 15 seconds. This is not real dispatch or push messaging.
+
 Terminate public HTTPS at a maintained reverse proxy or load balancer; do not expose the app directly to the internet without TLS and appropriate network controls. Set secure backups and recovery before relying on stored rides. The public OpenStreetMap tile service is best-effort and intended for light use; production traffic may require a tile provider or self-hosted tiles. This portable setup is not a deployment to a hosting provider, and it does not provide horizontal scaling, automated backups, monitoring, or payment processing.
 
 ### Clerk setup (one-time)
@@ -113,13 +121,16 @@ src/
 │  ├─ dashboard/page.tsx         # Rider dashboard
 │  ├─ profile/page.tsx           # Protected profile settings
 │  ├─ book/page.tsx              # Protected ride planner
-│  ├─ driver/page.tsx            # Protected demo driver dashboard
+│  ├─ driver/page.tsx            # Driver dashboard gated by the server allow-list
 │  ├─ history/page.tsx           # Protected account-scoped ride history and reviews
 │  └─ api/
 │     ├─ health/ready/route.ts   # Public database readiness check
-│     └─ rides/
-│        ├─ route.ts             # Authenticated ride list and creation
-│        └─ [rideId]/route.ts    # Owner-scoped ride transitions and reviews
+│     ├─ rides/
+│     │  ├─ route.ts             # Authenticated ride list and creation
+│     │  └─ [rideId]/route.ts    # Owner-scoped rider cancellation and reviews
+│     └─ driver/rides/
+│        ├─ route.ts             # Allow-listed shared driver offer queue
+│        └─ [rideId]/route.ts    # Atomic driver accept/pass/start/complete
 ├─ components/
 │  ├─ Navbar.tsx                 # Auth controls and signed-in navigation
 │  ├─ ProfileEditor.tsx          # Name, phone verification, and photo editor
@@ -132,17 +143,23 @@ src/
 │  └─ RideHistoryExperience.tsx  # Searchable account-scoped ride history and estimates
 ├─ lib/
 │  ├─ ride.ts                    # Locations, fare estimates, and offer ranking
-│  ├─ ride-storage.ts            # Same-origin rides, notifications, and sync
-│  └─ server/ride-database.ts    # Local SQLite persistence scoped by Clerk user
+│  ├─ ride-storage.ts            # Rider rides, notifications, and sync
+│  ├─ driver-storage.ts          # Shared offer polling and driver actions
+│  └─ server/
+│     ├─ driver-access.ts        # Server-only Clerk ID allow-list
+│     ├─ ride-database.ts        # Rider-owned rides and atomic driver claims
+│     └─ schema.ts               # Drizzle SQLite schema
 └─ proxy.ts                      # Clerk middleware (Next.js 16 "proxy" file)
 tests/
+├─ driver-access.test.ts         # Explicit Clerk driver-ID allow-list behavior
 ├─ health-ready.test.ts          # Uncached readiness success/failure without database detail leaks
 ├─ ride.test.ts                  # Fare, distance, formatting, and offer ranking
 ├─ ride-storage.test.ts          # Ride lifecycle, notifications, and local reviews
-├─ ride-database.test.ts         # SQLite storage and user-isolation checks
-└─ ride-api.test.ts              # Client/API lifecycle, review, and owner-isolation integration
+├─ ride-database.test.ts         # SQLite storage, ownership, and atomic driver claims
+└─ ride-api.test.ts              # Rider + driver API lifecycle and isolation integration
 artifacts/day13/                 # Readiness endpoint and inspected light/dark/mobile UI captures
 artifacts/day14/                 # Final readiness and UI verification captures
+artifacts/day15/                 # Shared-driver queue UI and API captures
 drizzle.config.ts                # Drizzle Kit SQLite configuration
 drizzle/                         # Generated SQL migrations and migration journal
 Dockerfile                       # Multi-stage production standalone image
@@ -158,7 +175,7 @@ scripts/prepare-standalone.mjs   # Include static assets and SQL migrations in s
 | `npm run build` | Production build                 |
 | `npm run start` | Run the production standalone server |
 | `npm run lint`  | Run ESLint                       |
-| `npm test`      | Run ride logic, storage, and signed-in API flow tests |
+| `npm test`      | Run ride logic, storage, driver authorization, and signed-in API flow tests |
 | `npm run db:generate` | Generate a Drizzle SQL migration |
 | `npm run db:migrate` | Apply pending migrations to SQLite |
 | `npm run db:studio` | Open Drizzle Studio for the local database |
