@@ -81,6 +81,11 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
   - [x] Paginate the authenticated notification API with stable keyset cursors, preserving owner scoping
   - [x] Link the inbox from the notification bell and mobile navigation; verify responsive light/dark layouts and API pagination
   - [x] Test cursor validation, unread filtering, pagination, read actions, and account privacy
+- [x] **Day 18 — Notification cleanup controls**
+  - [x] Add owner-scoped removal of individual notification records and bulk clearing of read records
+  - [x] Return read/unread totals and preserve unread alerts during bulk cleanup
+  - [x] Add accessible inbox controls and validate all DELETE endpoints, privacy, and cleanup counts
+  - [x] Capture and inspect changed endpoints and light/dark responsive inbox screens
 
 ## Getting started
 

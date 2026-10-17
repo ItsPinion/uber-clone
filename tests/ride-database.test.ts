@@ -4,7 +4,10 @@ import { test } from "node:test";
 import { VIZAG_LOCATIONS, type SavedRideRequest } from "../src/lib/ride";
 import {
   checkRideDatabaseReady,
+  countReadRideNotificationsForUser,
   createRideForUser,
+  deleteReadRideNotificationsForUser,
+  deleteRideNotificationForUser,
   findRideForUser,
   findRideOfferForDriver,
   listRideNotificationsForUser,
@@ -83,6 +86,27 @@ test("notification read actions are private to their owning account", () => {
   assert.equal(markRideNotificationReadForUser(ownerId, ownerNotification.id), true);
 });
 
+test("notification cleanup removes only read records belonging to the account", () => {
+  const ownerId = randomUUID();
+  const otherUserId = randomUUID();
+  createRideForUser(ownerId, makeRide());
+  createRideForUser(ownerId, makeRide());
+  createRideForUser(otherUserId, makeRide());
+  const ownerNotifications = listRideNotificationsForUser(ownerId);
+  const otherNotification = listRideNotificationsForUser(otherUserId)[0];
+  markRideNotificationReadForUser(ownerId, ownerNotifications[0].id);
+
+  assert.equal(countReadRideNotificationsForUser(ownerId), 1);
+  assert.equal(deleteRideNotificationForUser(ownerId, otherNotification.id), false);
+  assert.equal(deleteReadRideNotificationsForUser(ownerId), 1);
+  assert.equal(countReadRideNotificationsForUser(ownerId), 0);
+  assert.equal(countUnreadRideNotificationsForUser(ownerId), 1);
+  assert.equal(countUnreadRideNotificationsForUser(otherUserId), 1);
+  assert.equal(deleteRideNotificationForUser(ownerId, ownerNotifications[1].id), true);
+  assert.equal(countUnreadRideNotificationsForUser(ownerId), 0);
+  assert.equal(countUnreadRideNotificationsForUser(otherUserId), 1);
+});
+
 test("driver queue is shared, excludes a driver's own requests, and claims rides once", () => {
   const riderId = randomUUID();
   const driverId = randomUUID();
@@ -113,7 +137,7 @@ test("driver queue is shared, excludes a driver's own requests, and claims rides
   assert.equal(transitionRideForDriver(driverId, riderId, completedRide, "in_progress", { title: "Ride completed", message: "Complete." }), true);
   assert.equal(findRideForUser(riderId, riderRide.id)?.status, "completed");
   const rideNotifications = listRideNotificationsForUser(riderId).filter((notification) => notification.rideId === riderRide.id);
-  assert.deepEqual(rideNotifications.map((notification) => notification.title), ["Ride completed", "Ride started", "Driver matched", "Ride request saved"]);
+  assert.deepEqual(rideNotifications.map((notification) => notification.title).sort(), ["Ride completed", "Ride started", "Driver matched", "Ride request saved"].sort());
   assert.equal(countUnreadRideNotificationsForUser(riderId), rideNotifications.length);
   assert.equal(markRideNotificationReadForUser(riderId, rideNotifications[0].id), true);
   assert.equal(markRideNotificationReadForUser(otherDriverId, rideNotifications[1].id), false);

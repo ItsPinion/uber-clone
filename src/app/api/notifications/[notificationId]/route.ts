@@ -1,5 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
-import { markRideNotificationReadForUser } from "@/lib/server/ride-database";
+import {
+  countReadRideNotificationsForUser,
+  countUnreadRideNotificationsForUser,
+  deleteRideNotificationForUser,
+  markRideNotificationReadForUser,
+} from "@/lib/server/ride-database";
 
 type RouteContext = { params: Promise<{ notificationId: string }> };
 const noStore = { headers: { "Cache-Control": "private, no-store" } };
@@ -24,5 +29,23 @@ export async function PATCH(request: Request, context: RouteContext) {
     return Response.json({ ok: true }, noStore);
   } catch {
     return Response.json({ error: "Could not update this notification." }, { status: 500, ...noStore });
+  }
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: "Sign in to remove notifications." }, { status: 401, ...noStore });
+  const { notificationId } = await context.params;
+  try {
+    if (!deleteRideNotificationForUser(userId, notificationId)) {
+      return Response.json({ error: "Notification not found." }, { status: 404, ...noStore });
+    }
+    return Response.json({
+      ok: true,
+      unreadCount: countUnreadRideNotificationsForUser(userId),
+      readCount: countReadRideNotificationsForUser(userId),
+    }, noStore);
+  } catch {
+    return Response.json({ error: "Could not remove this notification." }, { status: 500, ...noStore });
   }
 }

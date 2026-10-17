@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import Database from "better-sqlite3";
-import { and, count, desc, eq, isNull, lt, not, or } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, isNull, lt, not, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import type { SavedRideRequest } from "@/lib/ride";
@@ -195,6 +195,31 @@ export function countUnreadRideNotificationsForUser(userId: string) {
     .where(and(eq(rideNotifications.userId, userId), isNull(rideNotifications.readAt)))
     .get();
   return Number(result?.value ?? 0);
+}
+
+export function countReadRideNotificationsForUser(userId: string) {
+  const result = getDatabase()
+    .select({ value: count() })
+    .from(rideNotifications)
+    .where(and(eq(rideNotifications.userId, userId), isNotNull(rideNotifications.readAt)))
+    .get();
+  return Number(result?.value ?? 0);
+}
+
+export function deleteRideNotificationForUser(userId: string, notificationId: string) {
+  return getDatabase()
+    .delete(rideNotifications)
+    .where(and(eq(rideNotifications.userId, userId), eq(rideNotifications.id, notificationId)))
+    .run()
+    .changes === 1;
+}
+
+export function deleteReadRideNotificationsForUser(userId: string) {
+  return getDatabase()
+    .delete(rideNotifications)
+    .where(and(eq(rideNotifications.userId, userId), isNotNull(rideNotifications.readAt)))
+    .run()
+    .changes;
 }
 
 export function markRideNotificationReadForUser(userId: string, notificationId: string) {

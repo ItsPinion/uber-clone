@@ -1,6 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import {
+  countReadRideNotificationsForUser,
   countUnreadRideNotificationsForUser,
+  deleteReadRideNotificationsForUser,
   listRideNotificationsForUser,
   markAllRideNotificationsReadForUser,
   type RideNotificationCursor,
@@ -21,6 +23,10 @@ function parseCursor(value: string | null): RideNotificationCursor | undefined |
   } catch {
     return null;
   }
+}
+
+function isAction(value: unknown, action: string): boolean {
+  return typeof value === "object" && value !== null && !Array.isArray(value) && (value as { action?: unknown }).action === action;
 }
 
 export async function GET(request: Request) {
@@ -49,6 +55,7 @@ export async function GET(request: Request) {
     return Response.json({
       notifications,
       unreadCount: countUnreadRideNotificationsForUser(userId),
+      readCount: countReadRideNotificationsForUser(userId),
       nextCursor,
     }, noStore);
   } catch {
@@ -65,7 +72,7 @@ export async function PATCH(request: Request) {
   } catch {
     return Response.json({ error: "Send a valid notification action." }, { status: 400, ...noStore });
   }
-  if (typeof body !== "object" || body === null || Array.isArray(body) || (body as { action?: unknown }).action !== "read-all") {
+  if (!isAction(body, "read-all")) {
     return Response.json({ error: "Choose a supported notification action." }, { status: 400, ...noStore });
   }
   try {
@@ -73,5 +80,30 @@ export async function PATCH(request: Request) {
     return Response.json({ updated, unreadCount: countUnreadRideNotificationsForUser(userId) }, noStore);
   } catch {
     return Response.json({ error: "Could not update notifications." }, { status: 500, ...noStore });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const { userId } = await auth();
+  if (!userId) return Response.json({ error: "Sign in to clear notifications." }, { status: 401, ...noStore });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Send a valid notification cleanup action." }, { status: 400, ...noStore });
+  }
+  if (!isAction(body, "clear-read")) {
+    return Response.json({ error: "Choose the clear-read action." }, { status: 400, ...noStore });
+  }
+  try {
+    const deleted = deleteReadRideNotificationsForUser(userId);
+    return Response.json({
+      ok: true,
+      deleted,
+      unreadCount: countUnreadRideNotificationsForUser(userId),
+      readCount: countReadRideNotificationsForUser(userId),
+    }, noStore);
+  } catch {
+    return Response.json({ error: "Could not clear read notifications." }, { status: 500, ...noStore });
   }
 }

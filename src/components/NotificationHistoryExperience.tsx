@@ -5,13 +5,15 @@ import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
+  clearReadRideNotificationsOnServer,
+  deleteRideNotificationOnServer,
   markAllRideNotificationsReadOnServer,
   markRideNotificationReadOnServer,
   type RideNotification,
 } from "@/lib/ride-storage";
 
 type NotificationFilter = "all" | "unread";
-type NotificationPage = { notifications: RideNotification[]; unreadCount: number; nextCursor: string | null; error?: string };
+type NotificationPage = { notifications: RideNotification[]; unreadCount: number; readCount: number; nextCursor: string | null; error?: string };
 
 function formatNotificationDate(value: string) {
   const date = new Date(value);
@@ -42,12 +44,15 @@ export default function NotificationHistoryExperience() {
   const [notifications, setNotifications] = useState<RideNotification[]>([]);
   const [notificationsOwnerId, setNotificationsOwnerId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [readCount, setReadCount] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
+  const [isClearingRead, setIsClearingRead] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !userId) return;
@@ -57,6 +62,7 @@ export default function NotificationHistoryExperience() {
       setNotificationsOwnerId(userId);
       setNotifications(page.notifications);
       setUnreadCount(page.unreadCount);
+      setReadCount(page.readCount);
       setNextCursor(page.nextCursor);
     }).catch((loadError: unknown) => {
       if (!active) return;
@@ -78,6 +84,7 @@ export default function NotificationHistoryExperience() {
 
   const visibleNotifications = notificationsOwnerId === userId ? notifications : [];
   const visibleUnreadCount = notificationsOwnerId === userId ? unreadCount : 0;
+  const visibleReadCount = notificationsOwnerId === userId ? readCount : 0;
   const isPageLoading = !isLoaded || !userId || isLoading || (notificationsOwnerId !== userId && !error);
 
   async function loadMore() {
@@ -91,6 +98,7 @@ export default function NotificationHistoryExperience() {
         return [...current, ...page.notifications.filter((notification) => !seen.has(notification.id))];
       });
       setUnreadCount(page.unreadCount);
+      setReadCount(page.readCount);
       setNextCursor(page.nextCursor);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Could not load older notifications.");
@@ -99,16 +107,17 @@ export default function NotificationHistoryExperience() {
     }
   }
 
-  async function markRead(notificationId: string) {
-    if (!userId || notificationsOwnerId !== userId || updatingId) return;
-    setUpdatingId(notificationId);
+  async function markRead(notification: RideNotification) {
+    if (!userId || notificationsOwnerId !== userId || updatingId || deletingId || isClearingRead || isMarkingAllRead) return;
+    setUpdatingId(notification.id);
     setError("");
     try {
-      await markRideNotificationReadOnServer(notificationId, userId);
+      await markRideNotificationReadOnServer(notification.id, userId);
       setNotifications((current) => filter === "unread"
-        ? current.filter((notification) => notification.id !== notificationId)
-        : current.map((notification) => notification.id === notificationId ? { ...notification, read: true } : notification));
+        ? current.filter((item) => item.id !== notification.id)
+        : current.map((item) => item.id === notification.id ? { ...item, read: true } : item));
       setUnreadCount((count) => Math.max(0, count - 1));
+      setReadCount((count) => count + 1);
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : "Could not update this notification.");
     } finally {
@@ -116,14 +125,46 @@ export default function NotificationHistoryExperience() {
     }
   }
 
+  async function removeNotification(notification: RideNotification) {
+    if (!userId || notificationsOwnerId !== userId || updatingId || deletingId || isClearingRead || isMarkingAllRead) return;
+    setDeletingId(notification.id);
+    setError("");
+    try {
+      await deleteRideNotificationOnServer(notification.id, userId);
+      setNotifications((current) => current.filter((item) => item.id !== notification.id));
+      if (notification.read) setReadCount((count) => Math.max(0, count - 1));
+      else setUnreadCount((count) => Math.max(0, count - 1));
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Could not remove this notification.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function clearRead() {
+    if (!userId || notificationsOwnerId !== userId || readCount === 0 || isClearingRead || isMarkingAllRead || updatingId || deletingId) return;
+    setIsClearingRead(true);
+    setError("");
+    try {
+      await clearReadRideNotificationsOnServer(userId);
+      setNotifications((current) => current.filter((notification) => !notification.read));
+      setReadCount(0);
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Could not clear read notifications.");
+    } finally {
+      setIsClearingRead(false);
+    }
+  }
+
   async function markAllRead() {
-    if (!userId || notificationsOwnerId !== userId || unreadCount === 0 || isMarkingAllRead) return;
+    if (!userId || notificationsOwnerId !== userId || unreadCount === 0 || isMarkingAllRead || isClearingRead || deletingId || updatingId) return;
     setIsMarkingAllRead(true);
     setError("");
     try {
-      await markAllRideNotificationsReadOnServer(userId);
+      const updated = await markAllRideNotificationsReadOnServer(userId);
       setNotifications((current) => filter === "unread" ? [] : current.map((notification) => ({ ...notification, read: true })));
       if (filter === "unread") setNextCursor(null);
+      setReadCount((count) => count + updated);
       setUnreadCount(0);
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : "Could not update notifications.");
@@ -150,14 +191,22 @@ export default function NotificationHistoryExperience() {
             <h1 className="mt-3 text-3xl font-black tracking-[-0.055em] text-[var(--ink)] sm:text-4xl">Ride notifications</h1>
             <p className="mt-2 text-xs leading-5 text-[var(--muted)]">Ride requests and trip changes, synced to your account.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <span className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-[10px] font-bold text-[var(--muted)]">
               {visibleUnreadCount} unread
             </span>
             <button
               type="button"
+              onClick={() => void clearRead()}
+              disabled={visibleReadCount === 0 || isClearingRead || isMarkingAllRead || updatingId !== null || deletingId !== null}
+              className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-[9px] font-extrabold text-[var(--muted)] transition hover:border-rose-500/35 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-45 dark:hover:text-rose-300"
+            >
+              {isClearingRead ? "Clearing…" : `Clear read${visibleReadCount ? ` (${visibleReadCount})` : ""}`}
+            </button>
+            <button
+              type="button"
               onClick={() => void markAllRead()}
-              disabled={visibleUnreadCount === 0 || isMarkingAllRead}
+              disabled={visibleUnreadCount === 0 || isMarkingAllRead || isClearingRead || updatingId !== null || deletingId !== null}
               className="rounded-full bg-emerald-500 px-4 py-2.5 text-[10px] font-extrabold text-zinc-950 shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-45"
             >
               {isMarkingAllRead ? "Saving…" : "Mark all read"}
@@ -214,17 +263,29 @@ export default function NotificationHistoryExperience() {
                     <p className="mt-1.5 text-[10px] leading-5 text-[var(--muted)]">{notification.message}</p>
                     <p className="mt-2 text-[9px] font-semibold text-[var(--muted)]">{formatNotificationDate(notification.createdAt)}</p>
                   </div>
-                  {!notification.read && (
+                  <div className="mt-1 flex shrink-0 items-center gap-1.5">
+                    {!notification.read && (
+                      <button
+                        type="button"
+                        onClick={() => void markRead(notification)}
+                        disabled={updatingId !== null || deletingId !== null || isClearingRead}
+                        aria-label={`Mark ${notification.title} as read`}
+                        className="rounded-full border border-[var(--line)] px-3 py-2 text-[9px] font-bold text-[var(--muted)] transition hover:border-emerald-500/40 hover:text-emerald-700 disabled:opacity-50 dark:hover:text-emerald-300"
+                      >
+                        {updatingId === notification.id ? "Saving…" : "Mark read"}
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => void markRead(notification.id)}
-                      disabled={updatingId !== null}
-                      aria-label={`Mark ${notification.title} as read`}
-                      className="mt-1 shrink-0 rounded-full border border-[var(--line)] px-3 py-2 text-[9px] font-bold text-[var(--muted)] transition hover:border-emerald-500/40 hover:text-emerald-700 disabled:opacity-50 dark:hover:text-emerald-300"
+                      onClick={() => void removeNotification(notification)}
+                      disabled={updatingId !== null || deletingId !== null || isClearingRead}
+                      aria-label={`Remove ${notification.title}`}
+                      title="Remove notification"
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--line)] text-[var(--muted)] transition hover:border-rose-500/35 hover:text-rose-700 disabled:opacity-50 dark:hover:text-rose-300"
                     >
-                      {updatingId === notification.id ? "Saving…" : "Mark read"}
+                      {deletingId === notification.id ? "…" : "×"}
                     </button>
-                  )}
+                  </div>
                 </motion.article>
               ))}
             </div>

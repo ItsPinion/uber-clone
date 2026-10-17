@@ -258,7 +258,27 @@ export async function markAllRideNotificationsReadOnServer(userId: string | null
     body: JSON.stringify({ action: "read-all" }),
   });
   if (!response.ok) throw new Error("Could not update notifications.");
+  const payload = await response.json().catch(() => null) as { updated?: number } | null;
   if (userId) await refreshRideNotificationsFromServer(userId);
+  return Number(payload?.updated ?? 0);
+}
+
+export async function deleteRideNotificationOnServer(notificationId: string, userId: string | null) {
+  const response = await fetch(`/api/notifications/${encodeURIComponent(notificationId)}`, { method: "DELETE" });
+  if (!response.ok) throw new Error("Could not remove this notification.");
+  if (userId) await refreshRideNotificationsFromServer(userId);
+}
+
+export async function clearReadRideNotificationsOnServer(userId: string | null) {
+  const response = await fetch("/api/notifications", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "clear-read" }),
+  });
+  if (!response.ok) throw new Error("Could not clear read notifications.");
+  const payload = await response.json().catch(() => null) as { deleted?: number } | null;
+  if (userId) await refreshRideNotificationsFromServer(userId);
+  return Number(payload?.deleted ?? 0);
 }
 
 // Kept for the browser-local storage unit tests and old, unclaimed browser data.
