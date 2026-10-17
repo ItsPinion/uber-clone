@@ -53,6 +53,21 @@ test("SQLite stores ride data under its Clerk user and does not expose it to ano
   assert.equal(findRideForUser(otherUserId, ride.id), null);
 });
 
+test("notification pages use stable descending cursors and unread filtering", () => {
+  const ownerId = randomUUID();
+  for (let index = 0; index < 3; index++) createRideForUser(ownerId, makeRide());
+  const firstPage = listRideNotificationsForUser(ownerId, { limit: 1 });
+  assert.equal(firstPage.length, 2, "one extra row signals that another page exists");
+  const cursor = { createdAt: firstPage[0].createdAt, id: firstPage[0].id };
+  const secondPage = listRideNotificationsForUser(ownerId, { limit: 1, cursor });
+  assert.notEqual(secondPage[0].id, firstPage[0].id);
+  const allIds = [firstPage[0].id, secondPage[0].id];
+  assert.equal(new Set(allIds).size, allIds.length);
+  assert.equal(listRideNotificationsForUser(ownerId, { unreadOnly: true }).length, 3);
+  markRideNotificationReadForUser(ownerId, firstPage[0].id);
+  assert.equal(listRideNotificationsForUser(ownerId, { unreadOnly: true }).length, 2);
+});
+
 test("notification read actions are private to their owning account", () => {
   const ownerId = randomUUID();
   const otherUserId = randomUUID();

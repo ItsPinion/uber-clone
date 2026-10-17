@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -97,7 +98,10 @@ export default function NotificationBell() {
                 </div>
               )}
             </div>
-            <div className="border-t border-[var(--line)] px-4 py-2.5 text-center text-[8px] font-medium text-[var(--muted)]">Same-origin demo notifications · no push service connected</div>
+            <div className="flex items-center justify-between gap-2 border-t border-[var(--line)] px-4 py-2.5 text-[8px] font-medium text-[var(--muted)]">
+              <span>Synced to your account · no push</span>
+              <Link href="/notifications" onClick={() => setIsOpen(false)} className="shrink-0 font-extrabold text-emerald-700 transition hover:text-emerald-500 dark:text-emerald-300">View all updates →</Link>
+            </div>
           </motion.section>
         )}
       </AnimatePresence>

@@ -76,6 +76,11 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
   - [x] Add authenticated same-origin notification APIs and 15-second polling with focus/visibility refresh
   - [x] Capture and inspect notification UI and API responses; run lifecycle, authorization, and privacy tests
   - [ ] WebSockets and operating-system push delivery remain out of scope
+- [x] **Day 17 — Notification inbox and history**
+  - [x] Add an account-protected inbox with all/unread filters, per-item read actions, and mark-all-read
+  - [x] Paginate the authenticated notification API with stable keyset cursors, preserving owner scoping
+  - [x] Link the inbox from the notification bell and mobile navigation; verify responsive light/dark layouts and API pagination
+  - [x] Test cursor validation, unread filtering, pagination, read actions, and account privacy
 
 ## Getting started
 
@@ -88,7 +93,7 @@ npm run dev                        # http://localhost:3000
 
 For schema changes, run `npm run db:generate`, then `npm run db:migrate`. `npm run db:studio` opens Drizzle Studio. To use a non-default database file, set `CABBOOK_DATABASE_PATH` in your shell before both the migration and dev commands.
 
-The local SQLite API uses Drizzle ORM with the `better-sqlite3` adapter and writes to `data/cabbook.sqlite` by default (or to `CABBOOK_DATABASE_PATH` if set). Ride requests, status transitions, reviews, and notifications are persisted per signed-in Clerk user. Ride lifecycle changes and their notification records are committed atomically; notification reads and unread counts are owner-scoped. The in-app bell polls same-origin authenticated APIs every 15 seconds and refreshes on focus/visibility changes, so notifications follow the account across devices using the same server database. This prototype does not use WebSockets, Firebase, or operating-system push. Legacy rides under the old unscoped browser-storage key are left untouched and are not automatically imported or shown, because the app cannot safely determine which account owns them. This avoids assigning personal location history to the wrong account; the legacy data remains in the browser but is not available in the account ride-history UI, and no automatic migration or in-app export is provided. The database file is git-ignored. The self-hosted container stores it on a named Docker volume. This is intended for local development or a single server with a persistent writable disk; ephemeral/serverless deployments need a hosted database or persistent volume. Back up the SQLite volume regularly, and stop writes or use a SQLite-consistent backup procedure when taking a copy. SQLite is a single-instance prototype backend, not a highly available or multi-replica database.
+The local SQLite API uses Drizzle ORM with the `better-sqlite3` adapter and writes to `data/cabbook.sqlite` by default (or to `CABBOOK_DATABASE_PATH` if set). Ride requests, status transitions, reviews, and notifications are persisted per signed-in Clerk user. Ride lifecycle changes and their notification records are committed atomically; notification reads and unread counts are owner-scoped. The in-app bell polls same-origin authenticated APIs every 15 seconds and refreshes on focus/visibility changes, so notifications follow the account across devices using the same server database. The dedicated `/notifications` inbox supports unread filtering, per-item and bulk read actions, and stable cursor pagination (20 records per page). This prototype does not use WebSockets, Firebase, or operating-system push. Legacy rides under the old unscoped browser-storage key are left untouched and are not automatically imported or shown, because the app cannot safely determine which account owns them. This avoids assigning personal location history to the wrong account; the legacy data remains in the browser but is not available in the account ride-history UI, and no automatic migration or in-app export is provided. The database file is git-ignored. The self-hosted container stores it on a named Docker volume. This is intended for local development or a single server with a persistent writable disk; ephemeral/serverless deployments need a hosted database or persistent volume. Back up the SQLite volume regularly, and stop writes or use a SQLite-consistent backup procedure when taking a copy. SQLite is a single-instance prototype backend, not a highly available or multi-replica database.
 
 ### Self-host with Docker Compose
 
@@ -115,7 +120,7 @@ Terminate public HTTPS at a maintained reverse proxy or load balancer; do not ex
 4. Under **Configure → Paths** (or via the env vars), sign-in/up URLs are `/sign-in` and `/sign-up`; after auth users land on `/dashboard`.
 5. To use profile editing, allow name updates in the Clerk profile settings. To verify phone numbers, enable phone-number sign-in/verification and SMS delivery in the Clerk Dashboard.
 
-## Project structure (through Day 16)
+## Project structure (through Day 17)
 
 ```
 src/
@@ -130,6 +135,7 @@ src/
 │  ├─ book/page.tsx              # Protected ride planner
 │  ├─ driver/page.tsx            # Driver dashboard gated by the server allow-list
 │  ├─ history/page.tsx           # Protected account-scoped ride history and reviews
+│  ├─ notifications/page.tsx     # Protected account notification inbox
 │  └─ api/
 │     ├─ health/ready/route.ts   # Public database readiness check
 │     ├─ rides/
@@ -149,6 +155,7 @@ src/
 │  ├─ OpenStreetMapView.tsx      # Leaflet tiles, route line, and pickup markers
 │  ├─ DriverExperience.tsx       # Demo ride matching and lifecycle controls
 │  ├─ NotificationBell.tsx       # Account-synced in-app ride notification center
+│  ├─ NotificationHistoryExperience.tsx # Filterable, paginated account inbox
 │  ├─ DashboardRideSummary.tsx   # Live dashboard ride counts and recent requests
 │  └─ RideHistoryExperience.tsx  # Searchable account-scoped ride history and estimates
 ├─ lib/
@@ -165,12 +172,13 @@ tests/
 ├─ health-ready.test.ts          # Uncached readiness success/failure without database detail leaks
 ├─ ride.test.ts                  # Fare, distance, formatting, and offer ranking
 ├─ ride-storage.test.ts          # Ride lifecycle, notifications, and local reviews
-├─ ride-database.test.ts         # SQLite storage, ownership, and atomic driver claims
+├─ ride-database.test.ts         # SQLite ownership, atomic claims, and notification pagination
 └─ ride-api.test.ts              # Rider, driver, and notification API lifecycle/privacy integration
 artifacts/day13/                 # Readiness endpoint and inspected light/dark/mobile UI captures
 artifacts/day14/                 # Final readiness and UI verification captures
 artifacts/day15/                 # Shared-driver queue UI and API captures
 artifacts/day16/                 # Persistent notification UI and API captures
+artifacts/day17/                 # Filterable notification inbox and cursor API captures
 drizzle.config.ts                # Drizzle Kit SQLite configuration
 drizzle/                         # Generated SQL migrations and migration journal
 Dockerfile                       # Multi-stage production standalone image

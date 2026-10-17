@@ -59,7 +59,7 @@ test("signed-in client ride flows persist through the authenticated API and rema
       const requestUrl = new URL(String(input), "http://localhost");
       const request = new Request(requestUrl, init);
       if (requestUrl.pathname === "/api/rides" && request.method === "POST") return ridesRoute.POST(request);
-      if (requestUrl.pathname === "/api/notifications" && request.method === "GET") return notificationsRoute.GET();
+      if (requestUrl.pathname === "/api/notifications" && request.method === "GET") return notificationsRoute.GET(request);
       if (requestUrl.pathname === "/api/notifications" && request.method === "PATCH") return notificationsRoute.PATCH(request);
       const notificationMatch = requestUrl.pathname.match(/^\/api\/notifications\/([^/]+)$/);
       if (notificationMatch && request.method === "PATCH") {
@@ -85,6 +85,7 @@ test("signed-in client ride flows persist through the authenticated API and rema
     const create = (body: unknown) => ridesRoute.POST(new Request("http://localhost/api/rides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
     const update = (rideId: string, body: unknown) => rideRoute.PATCH(new Request(`http://localhost/api/rides/${rideId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }), { params: Promise.resolve({ rideId }) });
     const notificationRead = (notificationId: string, body: unknown = { action: "read" }) => notificationRoute.PATCH(new Request(`http://localhost/api/notifications/${notificationId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }), { params: Promise.resolve({ notificationId }) });
+    const notificationsGet = (query = "") => notificationsRoute.GET(new Request(`http://localhost/api/notifications${query}`));
     const notificationsUpdate = (body: unknown) => notificationsRoute.PATCH(new Request("http://localhost/api/notifications", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
     const driverUpdate = (rideId: string, body: unknown) => driverRideRoute.PATCH(new Request(`http://localhost/api/driver/rides/${rideId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }), { params: Promise.resolve({ rideId }) });
     const malformedDriverUpdate = (rideId: string) => driverRideRoute.PATCH(new Request(`http://localhost/api/driver/rides/${rideId}`, { method: "PATCH", body: "not-json" }), { params: Promise.resolve({ rideId }) });
@@ -105,7 +106,7 @@ test("signed-in client ride flows persist through the authenticated API and rema
     assert.equal((await create({ pickupId: pickup.id, dropoffId: dropoff.id, category: "scooter" })).status, 400);
     activeUserId = null;
     assert.equal((await listRides()).status, 401);
-    assert.equal((await notificationsRoute.GET()).status, 401);
+    assert.equal((await notificationsGet()).status, 401);
     assert.equal((await notificationsUpdate({ action: "read-all" })).status, 401);
     assert.equal((await notificationRead("notices-forbidden", { action: "read" })).status, 401);
     await assert.rejects(requestRideFromServer(pickup.id, dropoff.id, "comfort"), /Sign in to request a ride/);
@@ -118,7 +119,7 @@ test("signed-in client ride flows persist through the authenticated API and rema
     assert.equal(created.fare, estimateFare(created.distanceKm, "comfort"));
     cacheServerRideRequest(created, "rider-one");
     const rideId = created.id;
-    const initialNotificationResponse = await notificationsRoute.GET();
+    const initialNotificationResponse = await notificationsGet();
     assert.equal(initialNotificationResponse.status, 200);
     assert.match(initialNotificationResponse.headers.get("Cache-Control") ?? "", /private.*no-store/);
     const initialNotifications = await json<{ notifications: { id: string; rideId: string; title: string; read: boolean }[]; unreadCount: number }>(initialNotificationResponse);
@@ -126,6 +127,10 @@ test("signed-in client ride flows persist through the authenticated API and rema
     assert.equal(initialNotifications.notifications[0].rideId, rideId);
     assert.equal(initialNotifications.notifications[0].title, "Ride request saved");
     assert.equal(initialNotifications.notifications[0].read, false);
+    assert.equal((await notificationsGet("?filter=recent")).status, 400);
+    assert.equal((await notificationsGet("?limit=0")).status, 400);
+    assert.equal((await notificationsGet("?limit=51")).status, 400);
+    assert.equal((await notificationsGet("?cursor=not-a-cursor")).status, 400);
     assert.equal((await notificationRead(initialNotifications.notifications[0].id, { action: "archive" })).status, 400);
 
     activeUserId = null;
@@ -133,7 +138,7 @@ test("signed-in client ride flows persist through the authenticated API and rema
     assert.equal((await driverUpdate(rideId, { action: "accept" })).status, 401);
     activeUserId = "rider-two";
     assert.deepEqual(await json<{ rides: unknown[] }>(await listRides()), { rides: [] });
-    assert.deepEqual(await json<{ notifications: unknown[]; unreadCount: number }>(await notificationsRoute.GET()), { notifications: [], unreadCount: 0 });
+    assert.deepEqual(await json<{ notifications: unknown[]; unreadCount: number; nextCursor: string | null }>(await notificationsGet()), { notifications: [], unreadCount: 0, nextCursor: null });
     assert.equal((await notificationRead(initialNotifications.notifications[0].id)).status, 404);
     assert.equal((await notificationsUpdate({ action: "delete-all" })).status, 400);
     await assert.rejects(updateRideOnServer(rideId, "cancel"), /Ride not found/);
@@ -173,7 +178,7 @@ test("signed-in client ride flows persist through the authenticated API and rema
     await assert.rejects(updateDriverRideOnServer(rideId, "complete"), /not valid for the current ride status/);
     cacheServerRideUpdate(completed, "complete", "rider-one");
     activeUserId = "rider-one";
-    const lifecycleNotifications = await json<{ notifications: { id: string; rideId: string; title: string; read: boolean }[]; unreadCount: number }>(await notificationsRoute.GET());
+    const lifecycleNotifications = await json<{ notifications: { id: string; rideId: string; title: string; read: boolean }[]; unreadCount: number }>(await notificationsGet());
     const thisRideNotifications = lifecycleNotifications.notifications.filter((notice) => notice.rideId === rideId);
     assert.deepEqual(thisRideNotifications.map((notice) => notice.title), ["Ride completed", "Ride started", "Driver matched", "Ride request saved"]);
     assert.equal(thisRideNotifications.every((notice) => !notice.read), true);
@@ -181,6 +186,8 @@ test("signed-in client ride flows persist through the authenticated API and rema
     const markedAll = await json<{ updated: number; unreadCount: number }>(await notificationsUpdate({ action: "read-all" }));
     assert.equal(markedAll.unreadCount, 0);
     assert.equal(markedAll.updated, lifecycleNotifications.unreadCount - 1);
+    const clearedUnreadPage = await json<{ notifications: unknown[]; unreadCount: number; nextCursor: string | null }>(await notificationsGet("?filter=unread"));
+    assert.deepEqual(clearedUnreadPage, { notifications: [], unreadCount: 0, nextCursor: null });
     await assert.rejects(updateRideOnServer(rideId, "review", { rating: 0, comment: "invalid" }), /1 to 5 stars/);
     await assert.rejects(updateRideOnServer(rideId, "review", { rating: 5, comment: "x".repeat(501) }), /500 characters or fewer/);
     const reviewed = await updateRideOnServer(rideId, "review", { rating: 5, comment: "  Smooth ride!  " });
@@ -211,9 +218,18 @@ test("signed-in client ride flows persist through the authenticated API and rema
     const cancelled = await updateRideOnServer(cancelledRide.id, "cancel");
     assert.equal(cancelled.status, "cancelled");
     cacheServerRideUpdate(cancelled, "cancel", "rider-one");
-    const terminalNotifications = await json<{ notifications: { rideId: string; title: string }[] }>(await notificationsRoute.GET());
+    const terminalNotifications = await json<{ notifications: { rideId: string; title: string }[] }>(await notificationsGet());
     assert.ok(terminalNotifications.notifications.some((notice) => notice.rideId === declinedRide.id && notice.title === "Request passed on"));
     assert.ok(terminalNotifications.notifications.some((notice) => notice.rideId === cancelledRide.id && notice.title === "Ride request cancelled"));
+    const firstPage = await json<{ notifications: { id: string; read: boolean }[]; nextCursor: string | null }>(await notificationsGet("?limit=1"));
+    assert.equal(firstPage.notifications.length, 1);
+    assert.ok(firstPage.nextCursor);
+    const secondPage = await json<{ notifications: { id: string }[]; nextCursor: string | null }>(await notificationsGet(`?limit=1&cursor=${firstPage.nextCursor}`));
+    assert.equal(secondPage.notifications.length, 1);
+    assert.notEqual(secondPage.notifications[0].id, firstPage.notifications[0].id);
+    const unreadPage = await json<{ notifications: { read: boolean }[] }>(await notificationsGet("?filter=unread&limit=50"));
+    assert.ok(unreadPage.notifications.length > 0);
+    assert.equal(unreadPage.notifications.every((notice) => !notice.read), true);
   } finally {
     activeUserId = "rider-one";
     globalThis.fetch = originalFetch;

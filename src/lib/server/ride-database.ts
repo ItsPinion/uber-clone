@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import Database from "better-sqlite3";
-import { and, count, desc, eq, isNull, not, or } from "drizzle-orm";
+import { and, count, desc, eq, isNull, lt, not, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import type { SavedRideRequest } from "@/lib/ride";
@@ -157,7 +157,20 @@ export function transitionRideForDriver(
   });
 }
 
-export function listRideNotificationsForUser(userId: string) {
+export type RideNotificationCursor = { createdAt: string; id: string };
+
+export function listRideNotificationsForUser(
+  userId: string,
+  options: { unreadOnly?: boolean; cursor?: RideNotificationCursor; limit?: number } = {},
+) {
+  const conditions = [eq(rideNotifications.userId, userId)];
+  if (options.unreadOnly) conditions.push(isNull(rideNotifications.readAt));
+  if (options.cursor) {
+    conditions.push(or(
+      lt(rideNotifications.createdAt, options.cursor.createdAt),
+      and(eq(rideNotifications.createdAt, options.cursor.createdAt), lt(rideNotifications.id, options.cursor.id)),
+    )!);
+  }
   return getDatabase()
     .select({
       id: rideNotifications.id,
@@ -168,9 +181,9 @@ export function listRideNotificationsForUser(userId: string) {
       readAt: rideNotifications.readAt,
     })
     .from(rideNotifications)
-    .where(eq(rideNotifications.userId, userId))
-    .orderBy(desc(rideNotifications.createdAt))
-    .limit(50)
+    .where(and(...conditions))
+    .orderBy(desc(rideNotifications.createdAt), desc(rideNotifications.id))
+    .limit(Math.min(options.limit ?? 50, 51) + 1)
     .all()
     .map((notification) => ({ ...notification, read: notification.readAt !== null }));
 }

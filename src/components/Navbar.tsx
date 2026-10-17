@@ -18,12 +18,12 @@ export default function Navbar() {
       transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
       className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--header)] backdrop-blur-2xl"
     >
-      <nav className="mx-auto flex h-[76px] max-w-[1360px] items-center justify-between gap-3 px-3 sm:px-7 lg:px-10">
-        <Link href="/" aria-label="CabBook home" className="group flex shrink-0 items-center gap-3">
+      <nav className="mx-auto flex h-[76px] max-w-[1360px] items-center justify-between gap-3 px-3 sm:px-7 lg:px-10 max-[380px]:gap-1 max-[380px]:px-2">
+        <Link href="/" aria-label="CabBook home" className="group flex shrink-0 items-center gap-3 max-[380px]:gap-1">
           <motion.span
             whileHover={reduceMotion ? undefined : { rotate: -8, scale: 1.06 }}
             transition={{ type: "spring", stiffness: 400, damping: 18 }}
-            className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-[14px] bg-emerald-500 text-zinc-950 shadow-[0_8px_22px_rgba(16,185,129,0.22)]"
+            className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-[14px] bg-emerald-500 text-zinc-950 shadow-[0_8px_22px_rgba(16,185,129,0.22)] max-[380px]:h-8 max-[380px]:w-8"
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
               <path d="M5.2 13.8 6.7 8.9a2 2 0 0 1 1.9-1.4h6.8a2 2 0 0 1 1.9 1.4l1.5 4.9v3.1H5.2v-3.1Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
@@ -47,7 +47,7 @@ export default function Navbar() {
           </span>
         </Link>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 max-[380px]:gap-1">
           <Show when="signed-in">
             <div className="hidden items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--surface)] p-1 sm:flex">
               <Link
@@ -122,9 +122,10 @@ export default function Navbar() {
           </Show>
 
           <Show when="signed-in">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <Link href="/book" aria-current={pathname === "/book" ? "page" : undefined} className="mobile-nav-link sm:hidden">Ride</Link>
+            <div className="flex items-center gap-2 sm:gap-3 max-[380px]:gap-1">
+              <Link href="/book" aria-current={pathname === "/book" ? "page" : undefined} className="mobile-nav-link max-[380px]:px-2 sm:hidden">Ride</Link>
               <Link href="/driver" aria-current={pathname === "/driver" ? "page" : undefined} className="mobile-nav-link max-[380px]:hidden sm:hidden">Drive</Link>
+              <Link href="/notifications" aria-current={pathname === "/notifications" ? "page" : undefined} className="mobile-nav-link max-[380px]:px-2 sm:hidden">Updates</Link>
               <UserButton />
             </div>
           </Show>
