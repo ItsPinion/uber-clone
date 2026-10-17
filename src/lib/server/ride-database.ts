@@ -1,4 +1,5 @@
-import { join } from "node:path";
+import { mkdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import Database from "better-sqlite3";
 import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
@@ -14,11 +15,19 @@ function getDatabase() {
   if (databaseGlobal.cabbookRideDatabase) return databaseGlobal.cabbookRideDatabase;
 
   const configuredPath = process.env.CABBOOK_DATABASE_PATH ?? "./data/cabbook.sqlite";
+  if (configuredPath !== ":memory:") {
+    mkdirSync(dirname(resolve(/* turbopackIgnore: true */ configuredPath)), { recursive: true });
+  }
   const sqlite = new Database(configuredPath);
   const database = drizzle(sqlite);
   migrate(database, { migrationsFolder: join(process.cwd(), "drizzle") });
   databaseGlobal.cabbookRideDatabase = database;
   return database;
+}
+
+export function checkRideDatabaseReady() {
+  getDatabase().select({ id: rides.id }).from(rides).limit(1).all();
+  return true;
 }
 
 export function listRidesForUser(userId: string) {

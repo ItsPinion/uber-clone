@@ -1,0 +1,21 @@
+# Local credentials and runtime data must never enter the build context.
+.env*
+!.env.local.example
+/data
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Build/runtime output is generated inside the image.
+node_modules
+.next
+coverage
+artifacts
+
+# Repository metadata and local tooling.
+.git
+.github
+.DS_Store
+npm-debug.log*
+
+/secrets

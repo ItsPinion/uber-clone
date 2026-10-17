@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { VIZAG_LOCATIONS, type SavedRideRequest } from "../src/lib/ride";
-import { createRideForUser, findRideForUser, listRidesForUser, updateRideForUser } from "../src/lib/server/ride-database";
+import { checkRideDatabaseReady, createRideForUser, findRideForUser, listRidesForUser, updateRideForUser } from "../src/lib/server/ride-database";
 
 // Keep the test database in memory; the runtime database is a git-ignored file.
 process.env.CABBOOK_DATABASE_PATH = ":memory:";
@@ -19,6 +19,10 @@ function makeRide(): SavedRideRequest {
     status: "requested",
   };
 }
+
+test("SQLite readiness check runs successfully after migrations", () => {
+  assert.equal(checkRideDatabaseReady(), true);
+});
 
 test("SQLite stores ride data under its Clerk user and does not expose it to another user", () => {
   const ownerId = randomUUID();

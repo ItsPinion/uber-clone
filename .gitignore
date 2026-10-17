@@ -48,3 +48,7 @@ next-env.d.ts
 
 # allow the env template to be committed
 !.env.local.example
+
+# Local Docker Compose configuration and credentials
+/.env
+/secrets/

@@ -52,7 +52,13 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
   - [x] Refresh the signed-in ride list when a page becomes visible or regains focus, so server changes show across devices without a manual reload
   - [x] State clearly that fares are estimates and no payment is collected; do not request or store card details
   - [x] Defer real payment processing until a server-backed provider and deployment database strategy are selected
-- [ ] Days 13–14 — Deployment readiness and final polish
+- [x] **Day 13 — Portable container deployment readiness**
+  - [x] Build a production-only Next.js standalone container and Compose service
+  - [x] Persist SQLite data on a named volume and create missing database directories at runtime
+  - [x] Keep the Clerk secret out of image build arguments; inject it only into the running container
+  - [x] Add a database-backed readiness endpoint and container health check
+  - [x] Document self-hosted setup, backups, and local SQLite/OSM operational limits
+- [ ] Day 14 — Final polish
 
 ## Getting started
 
@@ -65,7 +71,22 @@ npm run dev                        # http://localhost:3000
 
 For schema changes, run `npm run db:generate`, then `npm run db:migrate`. `npm run db:studio` opens Drizzle Studio. To use a non-default database file, set `CABBOOK_DATABASE_PATH` in your shell before both the migration and dev commands.
 
-The local SQLite API uses Drizzle ORM with the `better-sqlite3` adapter and writes to `data/cabbook.sqlite` by default (or to `CABBOOK_DATABASE_PATH` if set). Ride requests, status transitions, and reviews are persisted per signed-in Clerk user. Browser-local notifications remain device-local and sync between same-origin tabs; their storage is separated by user. Legacy rides under the old unscoped browser-storage key are left untouched and are not automatically imported or shown, because the app cannot safely determine which account owns them. This avoids assigning personal location history to the wrong account; the legacy data remains in the browser but is not available in the account ride-history UI, and no automatic migration or in-app export is provided. The database file is git-ignored. This is intended for local development or a server with a persistent writable disk; ephemeral/serverless deployments need a hosted database or persistent volume.
+The local SQLite API uses Drizzle ORM with the `better-sqlite3` adapter and writes to `data/cabbook.sqlite` by default (or to `CABBOOK_DATABASE_PATH` if set). Ride requests, status transitions, and reviews are persisted per signed-in Clerk user. Browser-local notifications remain device-local and sync between same-origin tabs; their storage is separated by user. Legacy rides under the old unscoped browser-storage key are left untouched and are not automatically imported or shown, because the app cannot safely determine which account owns them. This avoids assigning personal location history to the wrong account; the legacy data remains in the browser but is not available in the account ride-history UI, and no automatic migration or in-app export is provided. The database file is git-ignored. The self-hosted container stores it on a named Docker volume. This is intended for local development or a single server with a persistent writable disk; ephemeral/serverless deployments need a hosted database or persistent volume. Back up the SQLite volume regularly, and stop writes or use a SQLite-consistent backup procedure when taking a copy. SQLite is a single-instance prototype backend, not a highly available or multi-replica database.
+
+### Self-host with Docker Compose
+
+Requires Docker Engine and the Docker Compose plugin. Keep Clerk credentials outside the image and source control:
+
+```bash
+cp .env.local.example .env
+# Fill in the Clerk keys in .env using a secure editor/secret manager.
+docker compose up --build -d
+docker compose ps
+```
+
+Compose passes `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` as a build argument because Next.js embeds the public key into the client bundle. `CLERK_SECRET_KEY` is supplied only to the running container, never as a Docker build argument. The container applies Drizzle migrations when it first opens the database, stores SQLite data in the persistent `cabbook-data` volume, and exposes `/api/health/ready` for database readiness. Set `HOST_PORT` in `.env` to change the host port. Use `docker compose logs -f web` to inspect service logs, `docker compose down` to stop it without deleting data, and `docker volume ls` to locate the database volume. `docker compose down -v` permanently deletes that volume and its ride data.
+
+Terminate public HTTPS at a maintained reverse proxy or load balancer; do not expose the app directly to the internet without TLS and appropriate network controls. Set secure backups and recovery before relying on stored rides. The public OpenStreetMap tile service is best-effort and intended for light use; production traffic may require a tile provider or self-hosted tiles. This portable setup is not a deployment to a hosting provider, and it does not provide horizontal scaling, automated backups, monitoring, or payment processing.
 
 ### Clerk setup (one-time)
 
@@ -75,7 +96,7 @@ The local SQLite API uses Drizzle ORM with the `better-sqlite3` adapter and writ
 4. Under **Configure → Paths** (or via the env vars), sign-in/up URLs are `/sign-in` and `/sign-up`; after auth users land on `/dashboard`.
 5. To use profile editing, allow name updates in the Clerk profile settings. To verify phone numbers, enable phone-number sign-in/verification and SMS delivery in the Clerk Dashboard.
 
-## Project structure (through Day 12)
+## Project structure (through Day 13)
 
 ```
 src/
@@ -90,9 +111,11 @@ src/
 │  ├─ book/page.tsx              # Protected ride planner
 │  ├─ driver/page.tsx            # Protected demo driver dashboard
 │  ├─ history/page.tsx           # Protected account-scoped ride history and reviews
-│  └─ api/rides/
-│     ├─ route.ts                # Authenticated ride list and creation
-│     └─ [rideId]/route.ts       # Owner-scoped ride transitions and reviews
+│  └─ api/
+│     ├─ health/ready/route.ts   # Public database readiness check
+│     └─ rides/
+│        ├─ route.ts             # Authenticated ride list and creation
+│        └─ [rideId]/route.ts    # Owner-scoped ride transitions and reviews
 ├─ components/
 │  ├─ Navbar.tsx                 # Auth controls and signed-in navigation
 │  ├─ ProfileEditor.tsx          # Name, phone verification, and photo editor
@@ -115,6 +138,9 @@ tests/
 └─ ride-api.test.ts              # Client/API lifecycle, review, and owner-isolation integration
 drizzle.config.ts                # Drizzle Kit SQLite configuration
 drizzle/                         # Generated SQL migrations and migration journal
+Dockerfile                       # Multi-stage production standalone image
+docker-compose.yml               # Self-hosted app, health check, and persistent volume
+scripts/prepare-standalone.mjs   # Include static assets and SQL migrations in standalone output
 ```
 
 ## Scripts
@@ -123,7 +149,7 @@ drizzle/                         # Generated SQL migrations and migration journa
 | --------------- | -------------------------------- |
 | `npm run dev`   | Start the dev server             |
 | `npm run build` | Production build                 |
-| `npm run start` | Serve the production build       |
+| `npm run start` | Run the production standalone server |
 | `npm run lint`  | Run ESLint                       |
 | `npm test`      | Run ride logic, storage, and signed-in API flow tests |
 | `npm run db:generate` | Generate a Drizzle SQL migration |
