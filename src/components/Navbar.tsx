@@ -39,7 +39,7 @@ export default function Navbar() {
           </motion.span>
           <span className="leading-none">
             <span className="block text-[17px] font-extrabold tracking-[-0.06em] text-[var(--ink)]">
-              cab<span className="text-emerald-600">book</span>
+              cab<span className="text-emerald-700 dark:text-emerald-300">book</span>
             </span>
             <span className="mt-1 block text-[8px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
               City rides, elevated

@@ -111,7 +111,8 @@ src/
 tests/
 ├─ ride.test.ts                  # Fare, distance, formatting, and offer ranking
 ├─ ride-storage.test.ts          # Ride lifecycle, notifications, and local reviews
-└─ ride-database.test.ts         # SQLite storage and user-isolation checks
+├─ ride-database.test.ts         # SQLite storage and user-isolation checks
+└─ ride-api.test.ts              # Client/API lifecycle, review, and owner-isolation integration
 drizzle.config.ts                # Drizzle Kit SQLite configuration
 drizzle/                         # Generated SQL migrations and migration journal
 ```
@@ -124,7 +125,7 @@ drizzle/                         # Generated SQL migrations and migration journa
 | `npm run build` | Production build                 |
 | `npm run start` | Serve the production build       |
 | `npm run lint`  | Run ESLint                       |
-| `npm test`      | Run ride logic and storage tests |
+| `npm test`      | Run ride logic, storage, and signed-in API flow tests |
 | `npm run db:generate` | Generate a Drizzle SQL migration |
 | `npm run db:migrate` | Apply pending migrations to SQLite |
 | `npm run db:studio` | Open Drizzle Studio for the local database |

@@ -56,7 +56,7 @@ export default function AuthFrame({ children, eyebrow, title, detail }: {
           className="flex min-h-[590px] flex-col items-center justify-center px-5 py-10 sm:px-10 lg:px-12"
         >
           <div className="mb-6 w-full max-w-md lg:hidden">
-            <p className="text-xs font-extrabold tracking-[-0.04em] text-[var(--ink)]">cab<span className="text-emerald-600">book</span></p>
+            <p className="text-xs font-extrabold tracking-[-0.04em] text-[var(--ink)]">cab<span className="text-emerald-700 dark:text-emerald-300">book</span></p>
             <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--muted)]">{eyebrow}</p>
           </div>
           <div className="w-full max-w-md">{children}</div>
