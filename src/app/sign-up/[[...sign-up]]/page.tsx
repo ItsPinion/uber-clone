@@ -1,12 +1,17 @@
 import { Suspense } from "react";
 import { SignUp } from "@clerk/nextjs";
+import AuthFrame from "@/components/AuthFrame";
 
 export default function SignUpPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-12">
-      <Suspense fallback={<div className="h-[560px] w-full max-w-md animate-pulse rounded-2xl bg-zinc-200" />}>
+    <AuthFrame
+      eyebrow="Your ride starts here"
+      title="Make room for more."
+      detail="Create your CabBook account and make the in-between feel like part of the journey."
+    >
+      <Suspense fallback={<div className="h-[560px] w-full animate-pulse rounded-2xl bg-[var(--surface-2)]" />}>
         <SignUp />
       </Suspense>
-    </main>
+    </AuthFrame>
   );
 }
