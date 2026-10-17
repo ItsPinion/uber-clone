@@ -28,7 +28,7 @@ function nextRideForAction(ride: NonNullable<ReturnType<typeof findRideForUser>>
       comment: body.comment.trim(),
       createdAt: new Date().toISOString(),
     };
-    return { ride: { ...ride, review } };
+    return { ride: { ...ride, review }, notification: null };
   }
 
   if (typeof action !== "string" || !transitions[action]) {
@@ -50,7 +50,12 @@ function nextRideForAction(ride: NonNullable<ReturnType<typeof findRideForUser>>
     };
   }
 
-  return { ride: { ...ride, status: transition.to, ...(driver ? { driver } : {}) } };
+  return {
+    ride: { ...ride, status: transition.to, ...(driver ? { driver } : {}) },
+    notification: action === "cancel"
+      ? { title: "Ride request cancelled", message: `${ride.pickup.name} to ${ride.dropoff.name} was cancelled.` }
+      : null,
+  };
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -72,7 +77,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const result = nextRideForAction(ride, body);
     if ("error" in result) return Response.json({ error: result.error }, { status: result.status });
-    if (!updateRideForUser(userId, result.ride, ride.status)) {
+    if (!updateRideForUser(userId, result.ride, ride.status, result.notification)) {
       return Response.json({ error: "Ride update was not saved." }, { status: 409 });
     }
     return Response.json({ ride: result.ride }, { headers: { "Cache-Control": "private, no-store" } });

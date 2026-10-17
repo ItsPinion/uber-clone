@@ -95,8 +95,8 @@ test("signed-in ride caches use separate account keys and leave legacy rides unt
   assert.equal(JSON.parse(storage.getItem("cabbook:ride-requests:v2:user%2Fone") ?? "[]")[0].id, "server-ride-1");
   assert.equal(JSON.parse(storage.getItem("cabbook:ride-requests:v2:user-two") ?? "[]")[0].id, "server-ride-2");
   assert.deepEqual(JSON.parse(storage.getItem("cabbook:ride-requests:v1") ?? "[]"), legacyRides);
-  assert.equal(JSON.parse(storage.getItem("cabbook:notifications:v2:user%2Fone") ?? "[]")[0].rideId, "server-ride-1");
-  assert.equal(JSON.parse(storage.getItem("cabbook:notifications:v2:user-two") ?? "[]")[0].rideId, "server-ride-2");
+  assert.deepEqual(JSON.parse(storage.getItem("cabbook:notifications:v2:user%2Fone") ?? "[]"), []);
+  assert.deepEqual(JSON.parse(storage.getItem("cabbook:notifications:v2:user-two") ?? "[]"), []);
 });
 
 test("cancellation is limited to pending requests", () => {

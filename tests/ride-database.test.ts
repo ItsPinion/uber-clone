@@ -7,8 +7,12 @@ import {
   createRideForUser,
   findRideForUser,
   findRideOfferForDriver,
+  listRideNotificationsForUser,
   listRidesForDriver,
   listRidesForUser,
+  countUnreadRideNotificationsForUser,
+  markAllRideNotificationsReadForUser,
+  markRideNotificationReadForUser,
   transitionRideForDriver,
   updateRideForUser,
 } from "../src/lib/server/ride-database";
@@ -40,8 +44,28 @@ test("SQLite stores ride data under its Clerk user and does not expose it to ano
 
   assert.equal(createRideForUser(ownerId, ride), true);
   assert.deepEqual(listRidesForUser(ownerId), [ride]);
+  const initialNotifications = listRideNotificationsForUser(ownerId);
+  assert.equal(initialNotifications.length, 1);
+  assert.equal(initialNotifications[0].title, "Ride request saved");
+  assert.equal(initialNotifications[0].read, false);
+  assert.equal(listRideNotificationsForUser(otherUserId).some((notification) => notification.rideId === ride.id), false);
   assert.deepEqual(listRidesForUser(otherUserId), []);
   assert.equal(findRideForUser(otherUserId, ride.id), null);
+});
+
+test("notification read actions are private to their owning account", () => {
+  const ownerId = randomUUID();
+  const otherUserId = randomUUID();
+  createRideForUser(ownerId, makeRide());
+  createRideForUser(otherUserId, makeRide());
+  const ownerNotification = listRideNotificationsForUser(ownerId)[0];
+  const otherNotification = listRideNotificationsForUser(otherUserId)[0];
+
+  assert.equal(markRideNotificationReadForUser(ownerId, otherNotification.id), false);
+  assert.equal(markAllRideNotificationsReadForUser(ownerId), 1);
+  assert.equal(countUnreadRideNotificationsForUser(ownerId), 0);
+  assert.equal(countUnreadRideNotificationsForUser(otherUserId), 1);
+  assert.equal(markRideNotificationReadForUser(ownerId, ownerNotification.id), true);
 });
 
 test("driver queue is shared, excludes a driver's own requests, and claims rides once", () => {
@@ -63,16 +87,23 @@ test("driver queue is shared, excludes a driver's own requests, and claims rides
     status: "accepted" as const,
     driver: { name: "Demo Driver", vehicle: "Demo sedan", plate: "DEMO", pickupEtaMinutes: 5 },
   };
-  assert.equal(transitionRideForDriver(driverId, acceptedRide, "requested"), true);
-  assert.equal(transitionRideForDriver(otherDriverId, acceptedRide, "requested"), false);
+  assert.equal(transitionRideForDriver(driverId, riderId, acceptedRide, "requested", { title: "Driver matched", message: "Driver assigned." }), true);
+  assert.equal(transitionRideForDriver(otherDriverId, riderId, acceptedRide, "requested", { title: "Driver matched", message: "Driver assigned." }), false);
   assert.equal(findRideOfferForDriver(otherDriverId, riderRide.id), null);
   assert.ok(!listRidesForDriver(otherDriverId).some((ride) => ride.id === riderRide.id));
 
   const startedRide = { ...acceptedRide, status: "in_progress" as const };
-  assert.equal(transitionRideForDriver(driverId, startedRide, "accepted"), true);
+  assert.equal(transitionRideForDriver(driverId, riderId, startedRide, "accepted", { title: "Ride started", message: "In progress." }), true);
   const completedRide = { ...startedRide, status: "completed" as const };
-  assert.equal(transitionRideForDriver(driverId, completedRide, "in_progress"), true);
+  assert.equal(transitionRideForDriver(driverId, riderId, completedRide, "in_progress", { title: "Ride completed", message: "Complete." }), true);
   assert.equal(findRideForUser(riderId, riderRide.id)?.status, "completed");
+  const rideNotifications = listRideNotificationsForUser(riderId).filter((notification) => notification.rideId === riderRide.id);
+  assert.deepEqual(rideNotifications.map((notification) => notification.title), ["Ride completed", "Ride started", "Driver matched", "Ride request saved"]);
+  assert.equal(countUnreadRideNotificationsForUser(riderId), rideNotifications.length);
+  assert.equal(markRideNotificationReadForUser(riderId, rideNotifications[0].id), true);
+  assert.equal(markRideNotificationReadForUser(otherDriverId, rideNotifications[1].id), false);
+  assert.equal(markAllRideNotificationsReadForUser(riderId), rideNotifications.length - 1);
+  assert.equal(countUnreadRideNotificationsForUser(riderId), 0);
   const driverRides = listRidesForDriver(driverId);
   assert.equal(driverRides.find((ride) => ride.id === riderRide.id)?.status, "completed");
   assert.ok(!driverRides.some((ride) => ride.id === driverRide.id));

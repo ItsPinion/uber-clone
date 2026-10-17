@@ -36,7 +36,18 @@ function nextRideForAction(ride: SavedRideRequest, body: Record<string, unknown>
       pickupEtaMinutes: Math.max(3, Math.ceil(distance * 3 + 2)),
     };
   }
-  return { ride: { ...ride, status: transition.to, ...(driver ? { driver } : {}) }, expectedStatus: transition.from };
+  const notification = action === "accept"
+    ? { title: "Driver matched", message: `${driver?.name ?? "A driver"} accepted your ride request.` }
+    : action === "decline"
+      ? { title: "Request passed on", message: "A demo driver passed on your ride request." }
+      : action === "start"
+        ? { title: "Ride started", message: "Your demo trip is now in progress." }
+        : { title: "Ride completed", message: "Your demo trip is complete. Thanks for riding with CabBook." };
+  return {
+    ride: { ...ride, status: transition.to, ...(driver ? { driver } : {}) },
+    expectedStatus: transition.from,
+    notification,
+  };
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -54,11 +65,11 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (!isRecord(body)) return Response.json({ error: "Send a driver action." }, { status: 400, ...noStore });
 
   try {
-    const ride = findRideOfferForDriver(userId, rideId);
-    if (!ride) return Response.json({ error: "Ride offer not found." }, { status: 404, ...noStore });
-    const result = nextRideForAction(ride, body);
+    const rideRecord = findRideOfferForDriver(userId, rideId);
+    if (!rideRecord) return Response.json({ error: "Ride offer not found." }, { status: 404, ...noStore });
+    const result = nextRideForAction(rideRecord.ride, body);
     if ("error" in result) return Response.json({ error: result.error }, { status: result.status, ...noStore });
-    if (!transitionRideForDriver(userId, result.ride, result.expectedStatus)) {
+    if (!transitionRideForDriver(userId, rideRecord.ownerUserId, result.ride, result.expectedStatus, result.notification)) {
       return Response.json({ error: "This ride offer was already updated. Refresh your list." }, { status: 409, ...noStore });
     }
     return Response.json({ ride: result.ride }, noStore);

@@ -15,6 +15,13 @@
       "when": 1792230195922,
       "tag": "0001_calm_thena",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792232398254,
+      "tag": "0002_eminent_kinsey_walden",
+      "breakpoints": true
     }
   ]
 }

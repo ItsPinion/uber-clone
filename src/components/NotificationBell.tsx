@@ -3,7 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { markAllRideNotificationsRead, markRideNotificationRead, useRideNotifications } from "@/lib/ride-storage";
+import { markAllRideNotificationsReadOnServer, markRideNotificationReadOnServer, useRideNotifications } from "@/lib/ride-storage";
 
 function relativeTime(timestamp: string) {
   const elapsedSeconds = Math.max(0, Math.floor((Date.now() - new Date(timestamp).getTime()) / 1000));
@@ -16,10 +16,9 @@ function relativeTime(timestamp: string) {
 export default function NotificationBell() {
   const { isLoaded, user } = useUser();
   const userId = isLoaded ? user?.id ?? null : null;
-  const notifications = useRideNotifications();
+  const { notifications, unreadCount } = useRideNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const reduceMotion = useReducedMotion();
-  const unreadCount = notifications.reduce((count, notification) => count + (notification.read ? 0 : 1), 0);
   const latestNotifications = notifications.slice(0, 8);
 
   return (
@@ -61,10 +60,10 @@ export default function NotificationBell() {
             <div className="flex items-center justify-between gap-3 border-b border-[var(--line)] px-4 py-4">
               <div>
                 <p className="text-xs font-bold text-[var(--ink)]">Ride updates</p>
-                <p className="mt-0.5 text-[9px] text-[var(--muted)]">Live in this browser</p>
+                <p className="mt-0.5 text-[9px] text-[var(--muted)]">Synced to your account</p>
               </div>
               {unreadCount > 0 && (
-                <button type="button" onClick={() => markAllRideNotificationsRead(userId)} className="text-[9px] font-bold text-emerald-700 transition hover:text-emerald-500 dark:text-emerald-300">Mark all read</button>
+                <button type="button" onClick={() => void markAllRideNotificationsReadOnServer(userId).catch(() => undefined)} className="text-[9px] font-bold text-emerald-700 transition hover:text-emerald-500 dark:text-emerald-300">Mark all read</button>
               )}
             </div>
             <div className="max-h-[360px] overflow-y-auto p-2">
@@ -75,7 +74,7 @@ export default function NotificationBell() {
                   initial={reduceMotion ? false : { opacity: 0, x: 8 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.025 }}
-                  onClick={() => markRideNotificationRead(notification.id, userId)}
+                  onClick={() => void markRideNotificationReadOnServer(notification.id, userId).catch(() => undefined)}
                   className={`flex w-full items-start gap-3 rounded-xl p-3 text-left transition hover:bg-[var(--surface-2)] ${notification.read ? "opacity-65" : "bg-emerald-500/[0.045]"}`}
                 >
                   <span className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${notification.read ? "bg-[var(--surface-2)] text-[var(--muted)]" : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"}`}>

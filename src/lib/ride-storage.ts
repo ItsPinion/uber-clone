@@ -10,6 +10,12 @@ const CHANGE_EVENT = "cabbook:ride-data-change";
 const CHANNEL_NAME = "cabbook:ride-updates";
 const EMPTY_RIDES: SavedRideRequest[] = [];
 const EMPTY_NOTIFICATIONS: RideNotification[] = [];
+type RideNotificationSnapshot = { notifications: RideNotification[]; unreadCount: number };
+const EMPTY_NOTIFICATION_SNAPSHOT: RideNotificationSnapshot = { notifications: EMPTY_NOTIFICATIONS, unreadCount: 0 };
+const serverNotifications = new Map<string, RideNotificationSnapshot>();
+let activeNotificationUserId: string | null = null;
+let notificationSessionGeneration = 0;
+const notificationRefreshes = new Map<string, Promise<void>>();
 let cachedRidesKey: string | null = null;
 let cachedRidesRaw: string | null = null;
 let cachedRides: SavedRideRequest[] = EMPTY_RIDES;
@@ -181,11 +187,78 @@ export async function updateRideOnServer(rideId: string, action: RideUpdateActio
 export function useRideNotifications() {
   const { isLoaded, user } = useUser();
   const userId = isLoaded ? user?.id ?? null : null;
-  return useSyncExternalStore(
+  const notifications = useSyncExternalStore(
     subscribeToRideData,
-    () => userId ? getNotificationsSnapshot(userId) : EMPTY_NOTIFICATIONS,
-    () => EMPTY_NOTIFICATIONS,
+    () => userId ? serverNotifications.get(userId) ?? EMPTY_NOTIFICATION_SNAPSHOT : EMPTY_NOTIFICATION_SNAPSHOT,
+    () => EMPTY_NOTIFICATION_SNAPSHOT,
   );
+
+  useEffect(() => {
+    if (activeNotificationUserId !== userId) {
+      activeNotificationUserId = userId;
+      notificationSessionGeneration += 1;
+    }
+    if (!userId) return;
+    const sessionGeneration = notificationSessionGeneration;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void refreshRideNotificationsFromServer(userId, sessionGeneration);
+    };
+    void refreshRideNotificationsFromServer(userId, sessionGeneration);
+    const interval = window.setInterval(refresh, 15_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [userId]);
+  return notifications;
+}
+
+function refreshRideNotificationsFromServer(userId: string, sessionGeneration = notificationSessionGeneration) {
+  if (activeNotificationUserId !== userId) return Promise.resolve();
+  const requestKey = `${sessionGeneration}:${userId}`;
+  const inFlight = notificationRefreshes.get(requestKey);
+  if (inFlight) return inFlight;
+  const refresh = (async () => {
+    try {
+      const response = await fetch("/api/notifications", { cache: "no-store" });
+      const payload = await response.json().catch(() => null) as { notifications?: RideNotification[]; unreadCount?: number } | null;
+      if (!response.ok || !Array.isArray(payload?.notifications) || activeNotificationUserId !== userId || notificationSessionGeneration !== sessionGeneration) return;
+      serverNotifications.set(userId, {
+        notifications: payload.notifications,
+        unreadCount: Number.isInteger(payload.unreadCount) ? Number(payload.unreadCount) : payload.notifications.filter((notification) => !notification.read).length,
+      });
+      notifySubscribers();
+    } catch {
+      // Keep the last server snapshot visible when polling temporarily fails.
+    }
+  })().finally(() => {
+    if (notificationRefreshes.get(requestKey) === refresh) notificationRefreshes.delete(requestKey);
+  });
+  notificationRefreshes.set(requestKey, refresh);
+  return refresh;
+}
+
+export async function markRideNotificationReadOnServer(notificationId: string, userId: string | null) {
+  const response = await fetch(`/api/notifications/${encodeURIComponent(notificationId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "read" }),
+  });
+  if (!response.ok) throw new Error("Could not update this notification.");
+  if (userId) await refreshRideNotificationsFromServer(userId);
+}
+
+export async function markAllRideNotificationsReadOnServer(userId: string | null) {
+  const response = await fetch("/api/notifications", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "read-all" }),
+  });
+  if (!response.ok) throw new Error("Could not update notifications.");
+  if (userId) await refreshRideNotificationsFromServer(userId);
 }
 
 // Kept for the browser-local storage unit tests and old, unclaimed browser data.
@@ -203,7 +276,7 @@ export function saveRideRequest(request: Omit<SavedRideRequest, "id" | "createdA
 export function cacheServerRideRequest(ride: SavedRideRequest, userId: string | null = null) {
   recordLocalRideMutation(ride, userId);
   const nextList = [ride, ...getRidesSnapshot(userId).filter((existing) => existing.id !== ride.id)].slice(0, 100);
-  persistRides(nextList, {
+  persistRides(nextList, userId ? undefined : {
     rideId: ride.id,
     title: "New ride request",
     message: `${ride.pickup.name} to ${ride.dropoff.name}`,
@@ -222,7 +295,7 @@ export function cacheServerRideUpdate(ride: SavedRideRequest, action: RideUpdate
   };
   const nextList = [ride, ...getRidesSnapshot(userId).filter((existing) => existing.id !== ride.id)].slice(0, 100);
   const notification = messages[action];
-  persistRides(nextList, notification ? { ...notification, rideId: ride.id } : undefined, userId);
+  persistRides(nextList, !userId && notification ? { ...notification, rideId: ride.id } : undefined, userId);
   return ride;
 }
 
