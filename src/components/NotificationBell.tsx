@@ -99,7 +99,7 @@ export default function NotificationBell() {
               )}
             </div>
             <div className="flex items-center justify-between gap-2 border-t border-[var(--line)] px-4 py-2.5 text-[8px] font-medium text-[var(--muted)]">
-              <span>Synced to your account · no push</span>
+              <span>Live updates · manage device alerts in inbox</span>
               <Link href="/notifications" onClick={() => setIsOpen(false)} className="shrink-0 font-extrabold text-emerald-700 transition hover:text-emerald-500 dark:text-emerald-300">View all updates →</Link>
             </div>
           </motion.section>

@@ -6,7 +6,8 @@ import { and, count, desc, eq, isNotNull, isNull, lt, not, or } from "drizzle-or
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import type { SavedRideRequest } from "@/lib/ride";
-import { rideNotifications, rides } from "@/lib/server/schema";
+import { notificationPushSubscriptions, rideNotifications, rides } from "@/lib/server/schema";
+import { publishNotificationEvent } from "@/lib/server/notification-realtime.mjs";
 
 type ServerDatabase = ReturnType<typeof drizzle>;
 type DatabaseGlobal = typeof globalThis & { cabbookRideDatabase?: ServerDatabase };
@@ -24,6 +25,17 @@ function notificationValues(userId: string, rideId: string, notification: RideNo
     createdAt: new Date().toISOString(),
     readAt: null,
   };
+}
+
+function dispatchRideNotification(userId: string, notice: ReturnType<typeof notificationValues>) {
+  const event = {
+    userId,
+    data: { id: notice.id, rideId: notice.rideId, title: notice.title, message: notice.message, createdAt: notice.createdAt, read: false },
+  };
+  publishNotificationEvent(event);
+  void import("./notification-push-delivery")
+    .then(({ deliverNotificationPush }) => deliverNotificationPush(event))
+    .catch(() => undefined);
 }
 
 function getDatabase() {
@@ -66,7 +78,11 @@ export function findRideForUser(userId: string, rideId: string) {
 }
 
 export function createRideForUser(userId: string, ride: SavedRideRequest) {
-  return getDatabase().transaction((transaction) => {
+  const notification = notificationValues(userId, ride.id, {
+    title: "Ride request saved",
+    message: `${ride.pickup.name} to ${ride.dropoff.name}`,
+  });
+  const created = getDatabase().transaction((transaction) => {
     transaction.insert(rides).values({
       id: ride.id,
       userId,
@@ -74,12 +90,11 @@ export function createRideForUser(userId: string, ride: SavedRideRequest) {
       status: ride.status,
       payload: JSON.stringify(ride),
     }).run();
-    transaction.insert(rideNotifications).values(notificationValues(userId, ride.id, {
-      title: "Ride request saved",
-      message: `${ride.pickup.name} to ${ride.dropoff.name}`,
-    })).run();
+    transaction.insert(rideNotifications).values(notification).run();
     return true;
   });
+  if (created) dispatchRideNotification(userId, notification);
+  return created;
 }
 
 export function updateRideForUser(
@@ -88,16 +103,19 @@ export function updateRideForUser(
   expectedStatus: SavedRideRequest["status"],
   notification?: RideNotificationDraft | null,
 ) {
-  return getDatabase().transaction((transaction) => {
+  const notice = notification ? notificationValues(userId, ride.id, notification) : null;
+  const updated = getDatabase().transaction((transaction) => {
     const result = transaction
       .update(rides)
       .set({ createdAt: ride.createdAt, status: ride.status, payload: JSON.stringify(ride) })
       .where(and(eq(rides.userId, userId), eq(rides.id, ride.id), eq(rides.status, expectedStatus)))
       .run();
     if (result.changes !== 1) return false;
-    if (notification) transaction.insert(rideNotifications).values(notificationValues(userId, ride.id, notification)).run();
+    if (notice) transaction.insert(rideNotifications).values(notice).run();
     return true;
   });
+  if (updated && notice) dispatchRideNotification(userId, notice);
+  return updated;
 }
 
 export function listRidesForDriver(driverUserId: string) {
@@ -139,7 +157,8 @@ export function transitionRideForDriver(
   const assignedToDriver = expectedStatus === "requested"
     ? isNull(rides.driverUserId)
     : eq(rides.driverUserId, driverUserId);
-  return getDatabase().transaction((transaction) => {
+  const notice = notification ? notificationValues(ownerUserId, ride.id, notification) : null;
+  const updated = getDatabase().transaction((transaction) => {
     const result = transaction
       .update(rides)
       .set({ createdAt: ride.createdAt, status: ride.status, payload: JSON.stringify(ride), driverUserId })
@@ -152,9 +171,11 @@ export function transitionRideForDriver(
       ))
       .run();
     if (result.changes !== 1) return false;
-    if (notification) transaction.insert(rideNotifications).values(notificationValues(ownerUserId, ride.id, notification)).run();
+    if (notice) transaction.insert(rideNotifications).values(notice).run();
     return true;
   });
+  if (updated && notice) dispatchRideNotification(ownerUserId, notice);
+  return updated;
 }
 
 export type RideNotificationCursor = { createdAt: string; id: string };
@@ -220,6 +241,56 @@ export function deleteReadRideNotificationsForUser(userId: string) {
     .where(and(eq(rideNotifications.userId, userId), isNotNull(rideNotifications.readAt)))
     .run()
     .changes;
+}
+
+export type NotificationPushSubscriptionInput = {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+};
+
+export function saveNotificationPushSubscriptionForUser(userId: string, subscription: NotificationPushSubscriptionInput) {
+  const database = getDatabase();
+  const existing = database
+    .select({ userId: notificationPushSubscriptions.userId })
+    .from(notificationPushSubscriptions)
+    .where(eq(notificationPushSubscriptions.endpoint, subscription.endpoint))
+    .get();
+  if (existing && existing.userId !== userId) return false;
+  if (existing) {
+    database.update(notificationPushSubscriptions)
+      .set({ p256dh: subscription.keys.p256dh, auth: subscription.keys.auth })
+      .where(and(eq(notificationPushSubscriptions.endpoint, subscription.endpoint), eq(notificationPushSubscriptions.userId, userId)))
+      .run();
+    return true;
+  }
+  database.insert(notificationPushSubscriptions).values({
+    endpoint: subscription.endpoint,
+    userId,
+    p256dh: subscription.keys.p256dh,
+    auth: subscription.keys.auth,
+    createdAt: new Date().toISOString(),
+  }).run();
+  return true;
+}
+
+export function listNotificationPushSubscriptionsForUser(userId: string) {
+  return getDatabase()
+    .select({ endpoint: notificationPushSubscriptions.endpoint, p256dh: notificationPushSubscriptions.p256dh, auth: notificationPushSubscriptions.auth })
+    .from(notificationPushSubscriptions)
+    .where(eq(notificationPushSubscriptions.userId, userId))
+    .all();
+}
+
+export function deleteNotificationPushSubscriptionForUser(userId: string, endpoint: string) {
+  return getDatabase().delete(notificationPushSubscriptions)
+    .where(and(eq(notificationPushSubscriptions.userId, userId), eq(notificationPushSubscriptions.endpoint, endpoint)))
+    .run().changes === 1;
+}
+
+export function deleteNotificationPushSubscriptionByEndpoint(endpoint: string) {
+  return getDatabase().delete(notificationPushSubscriptions)
+    .where(eq(notificationPushSubscriptions.endpoint, endpoint))
+    .run().changes === 1;
 }
 
 export function markRideNotificationReadForUser(userId: string, notificationId: string) {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import NotificationPushControl from "@/components/NotificationPushControl";
 import {
   clearReadRideNotificationsOnServer,
   deleteRideNotificationOnServer,
@@ -213,6 +214,8 @@ export default function NotificationHistoryExperience() {
             </button>
           </div>
         </motion.div>
+
+        <NotificationPushControl />
 
         <section className="mt-8 overflow-hidden rounded-[24px] border border-[var(--line)] bg-[var(--surface)] shadow-[0_24px_80px_rgba(7,14,9,0.07)] dark:shadow-[0_24px_80px_rgba(0,0,0,0.14)]">
           <div className="flex items-center justify-between gap-4 border-b border-[var(--line)] px-4 py-4 sm:px-6">

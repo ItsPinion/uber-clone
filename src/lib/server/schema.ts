@@ -15,6 +15,18 @@ export const rideNotifications = sqliteTable(
   (table) => [index("ride_notifications_user_created_idx").on(table.userId, table.createdAt)],
 );
 
+export const notificationPushSubscriptions = sqliteTable(
+  "notification_push_subscriptions",
+  {
+    endpoint: text("endpoint").primaryKey(),
+    userId: text("user_id").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("notification_push_subscriptions_user_idx").on(table.userId)],
+);
+
 export const rides = sqliteTable(
   "rides",
   {

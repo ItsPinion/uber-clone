@@ -203,11 +203,53 @@ export function useRideNotifications() {
     const refresh = () => {
       if (document.visibilityState === "visible") void refreshRideNotificationsFromServer(userId, sessionGeneration);
     };
+    let disposed = false;
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+    let reconnectDelay = 1_000;
+    const scheduleReconnect = () => {
+      if (disposed || reconnectTimer !== null) return;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        void connectSocket();
+      }, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 2, 15_000);
+    };
+    const connectSocket = async () => {
+      try {
+        const response = await fetch("/api/notifications/socket-ticket", { method: "POST", cache: "no-store" });
+        const payload = await response.json().catch(() => null) as { ticket?: string } | null;
+        if (!response.ok || !payload?.ticket || disposed) {
+          scheduleReconnect();
+          return;
+        }
+        const address = new URL("/api/notifications/socket", window.location.href);
+        address.protocol = address.protocol === "https:" ? "wss:" : "ws:";
+        address.searchParams.set("ticket", payload.ticket);
+        socket = new WebSocket(address);
+        socket.onopen = () => { reconnectDelay = 1_000; };
+        socket.onmessage = (event) => {
+          if (activeNotificationUserId !== userId || notificationSessionGeneration !== sessionGeneration) return;
+          try {
+            const message = JSON.parse(String(event.data)) as { type?: unknown };
+            if (message.type === "notification") void refreshRideNotificationsFromServer(userId, sessionGeneration);
+          } catch { /* Ignore malformed events and retain the authenticated polling fallback. */ }
+        };
+        socket.onerror = () => socket?.close();
+        socket.onclose = scheduleReconnect;
+      } catch {
+        scheduleReconnect();
+      }
+    };
     void refreshRideNotificationsFromServer(userId, sessionGeneration);
+    void connectSocket();
     const interval = window.setInterval(refresh, 15_000);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
     return () => {
+      disposed = true;
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      socket?.close(1000, "Account changed");
       window.clearInterval(interval);
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
