@@ -4,6 +4,8 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
 
 ## Progress
 
+The original development plan is Days 1–14. Follow-on work after that plan is listed separately below.
+
 - [x] **Day 1 — Project setup & authentication**
   - [x] Initialize Next.js project (TypeScript, App Router, `src/` dir, ESLint)
   - [x] Install and configure Tailwind CSS
@@ -15,12 +17,12 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
   - [x] Add profile editing for name and profile photo using Clerk
   - [x] Add phone-number setup with SMS verification
   - [x] Protect the profile route through the existing Clerk proxy
-- [ ] **Day 4 — Map & ride request system**
+- [x] **Day 4 — Map & ride request system**
   - [x] Add Visakhapatnam pickup/drop-off selection, route preview, ride categories, and INR fare estimates
   - [x] Prototype ride requests, cancellation, and reference states (superseded by account-scoped persistence on Day 11)
-  - [x] Use OpenStreetMap tiles without an API key or credit card, with an offline illustration fallback and an approximate route overlay
+  - [x] Use OpenStreetMap tiles without an API key or credit card, with an offline illustration fallback and a road-following OSRM route (direct-line fallback if routing is unavailable)
   - [x] Persist ride requests through the authenticated SQLite API; fares and distances are recalculated server-side
-- [ ] **Day 5 — Driver dashboard & ride matching**
+- [x] **Day 5 — Driver dashboard & ride matching**
   - [x] Add a protected driver view with online/offline state and a nearby-request queue
   - [x] Rank demo offers by estimated pickup distance; accept or pass on requests
   - [x] Add accepted → in-progress → completed demo trip actions (server-backed across rider and driver accounts on Day 15)
@@ -63,7 +65,10 @@ Full-stack ride-hailing app built with **Next.js 16 (App Router)**, **React 19**
   - [x] Exclude the database readiness endpoint from Clerk middleware and return explicit `no-store` responses
   - [x] Test both healthy and unavailable SQLite readiness states without leaking database errors
   - [x] Capture and review production UI screenshots in light, dark, and mobile layouts; record the live readiness endpoint capture
-  - [x] Re-run ride, driver, booking, review, history, routing, and deployment checks
+  - [x] Re-run ride, driver, booking, review, history, routing, readiness, and production-build checks (Docker runtime was not available here)
+
+### Follow-on iterations (after the original 14-day plan)
+
 - [x] **Day 15 — Server-side driver matching**
   - [x] Add SQLite ownership for claimed driver rides and serialize concurrent claims
   - [x] Restrict driver pages and APIs to Clerk IDs in the server-side `CABBOOK_DRIVER_USER_IDS` allow-list
@@ -125,7 +130,7 @@ Terminate public HTTPS at a maintained reverse proxy or load balancer; do not ex
 4. Under **Configure → Paths** (or via the env vars), sign-in/up URLs are `/sign-in` and `/sign-up`; after auth users land on `/dashboard`.
 5. To use profile editing, allow name updates in the Clerk profile settings. To verify phone numbers, enable phone-number sign-in/verification and SMS delivery in the Clerk Dashboard.
 
-## Project structure (through Day 17)
+## Project structure (through Day 18)
 
 ```
 src/
@@ -150,8 +155,8 @@ src/
 │     │  ├─ route.ts             # Allow-listed shared driver offer queue
 │     │  └─ [rideId]/route.ts    # Atomic driver accept/pass/start/complete
 │     └─ notifications/
-│        ├─ route.ts             # Authenticated notification list and read-all
-│        └─ [notificationId]/route.ts # Owner-scoped read status
+│        ├─ route.ts             # Authenticated notification list, read-all, and clear-read
+│        └─ [notificationId]/route.ts # Owner-scoped read status and single-item deletion
 ├─ components/
 │  ├─ Navbar.tsx                 # Auth controls and signed-in navigation
 │  ├─ ProfileEditor.tsx          # Name, phone verification, and photo editor
@@ -184,6 +189,7 @@ artifacts/day14/                 # Final readiness and UI verification captures
 artifacts/day15/                 # Shared-driver queue UI and API captures
 artifacts/day16/                 # Persistent notification UI and API captures
 artifacts/day17/                 # Filterable notification inbox and cursor API captures
+artifacts/day18/                 # Notification cleanup endpoints and responsive inbox captures
 drizzle.config.ts                # Drizzle Kit SQLite configuration
 drizzle/                         # Generated SQL migrations and migration journal
 Dockerfile                       # Multi-stage production standalone image
