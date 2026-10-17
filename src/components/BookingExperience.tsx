@@ -185,8 +185,8 @@ export default function BookingExperience() {
         <span className="flex w-fit items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--muted)]"><span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-emerald-500" /> Visakhapatnam, AP</span>
       </motion.div>
 
-      <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] xl:gap-7">
-        <motion.section initial={reduceMotion ? false : { opacity: 0, x: -18 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.08, duration: 0.6 }} className="rounded-[26px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_16px_55px_rgba(15,23,18,0.045)] sm:p-7">
+      <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[0.9fr_1.1fr] xl:gap-7">
+        <motion.section initial={reduceMotion ? false : { opacity: 0, x: -18 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.08, duration: 0.6 }} className="min-w-0 rounded-[26px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[0_16px_55px_rgba(15,23,18,0.045)] sm:p-7">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">Plan your ride</p>
@@ -257,9 +257,9 @@ export default function BookingExperience() {
           <p className="mt-3 text-center text-[9px] leading-4 text-[var(--muted)]">Demo only: fares are estimates and no payment is collected. Open <Link href="/driver" target="_blank" rel="noreferrer" className="font-bold text-emerald-700 underline decoration-emerald-500/30 underline-offset-2 dark:text-emerald-300">Driver dashboard</Link> in another tab to accept this request. Requests are saved to your signed-in account.</p>
         </motion.section>
 
-        <motion.section initial={reduceMotion ? false : { opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.14, duration: 0.65 }} className="flex min-h-[430px] flex-col overflow-hidden rounded-[26px] border border-[var(--line)] bg-[var(--surface)] shadow-[0_16px_55px_rgba(15,23,18,0.045)] sm:min-h-[550px]">
+        <motion.section initial={reduceMotion ? false : { opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.14, duration: 0.65 }} className="flex min-w-0 min-h-[430px] flex-col overflow-hidden rounded-[26px] border border-[var(--line)] bg-[var(--surface)] shadow-[0_16px_55px_rgba(15,23,18,0.045)] sm:min-h-[550px]">
           <div className="flex items-center justify-between gap-4 border-b border-[var(--line)] px-5 py-4 sm:px-6">
-            <div><p className="text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">Your route</p><p className="mt-1 text-xs font-semibold text-[var(--ink)]">{pickup.area} <span className="mx-1 text-emerald-600">→</span> {dropoff.area}</p></div>
+            <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">Your route</p><p className="mt-1 truncate text-xs font-semibold text-[var(--ink)]">{pickup.area} <span className="mx-1 text-emerald-600">→</span> {dropoff.area}</p></div>
             <div className="flex items-center gap-2 rounded-full bg-[var(--surface-2)] p-1">
               <motion.button type="button" aria-label="Zoom in on route map" onClick={() => setZoom((value) => Math.min(1.28, value + 0.08))} whileTap={reduceMotion ? undefined : { scale: 0.85 }} className="flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold text-[var(--muted)] hover:bg-[var(--surface)]">+</motion.button>
               <motion.button type="button" aria-label="Zoom out on route map" onClick={() => setZoom((value) => Math.max(0.88, value - 0.08))} whileTap={reduceMotion ? undefined : { scale: 0.85 }} className="flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold text-[var(--muted)] hover:bg-[var(--surface)]">−</motion.button>

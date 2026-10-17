@@ -18,7 +18,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <ClerkProvider>
       <html lang="en" className="h-full antialiased" suppressHydrationWarning>
         <body className="flex min-h-full flex-col bg-[var(--canvas)] text-[var(--ink)]">
-          <ThemeProvider attribute="class" defaultTheme="light" enableSystem storageKey="cabbook-theme">
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="cabbook-theme">
             <ScrollProgress />
             <Suspense fallback={<div className="h-[76px] border-b border-[var(--line)] bg-[var(--header)]" />}>
               <Navbar />

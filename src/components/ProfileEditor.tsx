@@ -163,14 +163,14 @@ function ProfileForm({ user }: { user: ClerkUser }) {
       initial={reduceMotion ? false : { opacity: 0, y: 22, filter: "blur(5px)" }}
       animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
       transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-      className="grid gap-6 lg:grid-cols-[0.8fr_1.4fr]"
+      className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[0.8fr_1.4fr]"
     >
       <motion.aside
         initial={reduceMotion ? false : { opacity: 0, x: -18 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.08, duration: 0.65 }}
         whileHover={reduceMotion ? undefined : { y: -3 }}
-        className="h-fit rounded-3xl bg-zinc-950 p-6 text-white shadow-sm sm:p-7"
+        className="h-fit min-w-0 rounded-3xl bg-zinc-950 p-6 text-white shadow-sm sm:p-7"
       >
         <div className="flex items-center gap-4">
           <motion.div
@@ -225,7 +225,7 @@ function ProfileForm({ user }: { user: ClerkUser }) {
         initial={reduceMotion ? false : { opacity: 0, x: 18 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.15, duration: 0.7 }}
-        className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8"
+        className="min-w-0 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8"
       >
         <div className="flex flex-col justify-between gap-5 border-b border-zinc-100 pb-6 sm:flex-row sm:items-center">
           <div>

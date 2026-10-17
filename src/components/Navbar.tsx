@@ -18,7 +18,7 @@ export default function Navbar() {
       transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
       className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--header)] backdrop-blur-2xl"
     >
-      <nav className="mx-auto flex h-[76px] max-w-[1360px] items-center justify-between gap-3 px-4 sm:px-7 lg:px-10">
+      <nav className="mx-auto flex h-[76px] max-w-[1360px] items-center justify-between gap-3 px-3 sm:px-7 lg:px-10">
         <Link href="/" aria-label="CabBook home" className="group flex shrink-0 items-center gap-3">
           <motion.span
             whileHover={reduceMotion ? undefined : { rotate: -8, scale: 1.06 }}
@@ -41,7 +41,7 @@ export default function Navbar() {
             <span className="block text-[17px] font-extrabold tracking-[-0.06em] text-[var(--ink)]">
               cab<span className="text-emerald-700 dark:text-emerald-300">book</span>
             </span>
-            <span className="mt-1 block text-[8px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
+            <span className="mt-1 hidden text-[8px] font-bold uppercase tracking-[0.2em] text-[var(--muted)] sm:block">
               City rides, elevated
             </span>
           </span>
@@ -94,7 +94,9 @@ export default function Navbar() {
           </Show>
 
           <Show when="signed-in">
-            <NotificationBell />
+            <div className="hidden sm:block">
+              <NotificationBell />
+            </div>
           </Show>
           <ThemeToggle />
 
@@ -122,7 +124,7 @@ export default function Navbar() {
           <Show when="signed-in">
             <div className="flex items-center gap-2 sm:gap-3">
               <Link href="/book" aria-current={pathname === "/book" ? "page" : undefined} className="mobile-nav-link sm:hidden">Ride</Link>
-              <Link href="/driver" aria-current={pathname === "/driver" ? "page" : undefined} className="mobile-nav-link sm:hidden">Drive</Link>
+              <Link href="/driver" aria-current={pathname === "/driver" ? "page" : undefined} className="mobile-nav-link max-[380px]:hidden sm:hidden">Drive</Link>
               <UserButton />
             </div>
           </Show>
